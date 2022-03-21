@@ -65,12 +65,14 @@ function maze.on_chunk_generated(e)
     row = global.maze.rows[pos.y]
   end
 
+  -- Void this chunk if it's a maze boundary
   local cell = pos.x + x_boundary + 1
   if not row[cell] then
     void_area(e.area, e.surface)
     return
   end
 
+  -- Remove all resources
   for _, resource in pairs(e.surface.find_entities_filtered({ type = "resource" })) do
     resource.destroy({ raise_destroy = true })
   end
