@@ -104,23 +104,23 @@ function eller.step(Row)
   -- Randomly merge adjacent sets
 
   --- @type Cell[][]
-  local connected_sets = {}
+  local connected_groups = {}
   --- @type Cell[]
-  local connected_set = { 1 }
+  local connected_group = { 1 }
 
   for cell = 1, Row.width - 1 do
     if Row:same(cell, cell + 1) or math.random(2) == 1 then
       -- There is a wall
-      table.insert(connected_sets, connected_set)
-      connected_set = { cell + 1 }
+      table.insert(connected_groups, connected_group)
+      connected_group = { cell + 1 }
     else
       -- Merge the cells
       Row:merge(cell, cell + 1)
-      table.insert(connected_set, cell + 1)
+      table.insert(connected_group, cell + 1)
     end
   end
 
-  table.insert(connected_sets, connected_set)
+  table.insert(connected_groups, connected_group)
 
   -- Add vertical connections
 
@@ -142,31 +142,76 @@ function eller.step(Row)
     end
   end
 
-  -- Convert into an array of connections
+  -- Convert into a readable output
 
   local connections = {}
-  for _, connected_set in pairs(connected_sets) do
+  for _, connected_set in pairs(connected_groups) do
     for i, cell in pairs(connected_set) do
       local last = (i == #connected_set)
-      local map = { e = not last, s = table.find(verticals, cell) }
+      local map = { e = not last, s = table.find(verticals, cell), cell = cell, set = Row.cells[cell] }
       table.insert(connections, map)
     end
   end
 
-  -- Convert into a readable output
+  -- local wall = " "
+  -- local passage = "█"
+  -- local result = ""
+  -- local line = wall
+  -- local next_line = wall
+  -- for _, connections in ipairs(connections) do
+  --   line = line .. passage .. (connections.e and passage or wall)
+  --   next_line = next_line .. (connections.s and passage or wall) .. wall
+  -- end
+  -- result = result .. line .. "\n" .. next_line
 
-  local wall = " "
-  local passage = "X"
-
-  local result = ""
-
-  local line = wall
-  local next_line = wall
-  for _, connections in ipairs(connections) do
-    line = line .. passage .. (connections.e and passage or wall)
-    next_line = next_line .. (connections.s and passage or wall) .. wall
+  if not global.y then
+    global.y = 0
   end
-  result = result .. line .. "\n" .. next_line
+  local y = global.y
+  local g = 0.6
+
+  for x, connections in pairs(connections) do
+    local x = x * 2
+    local y = y * 2
+    rendering.draw_rectangle({
+      color = { g = g, a = 1 },
+      filled = true,
+      left_top = { x = x, y = y },
+      right_bottom = { x = x + 1, y = y + 1 },
+      surface = game.surfaces.nauvis,
+    })
+    rendering.draw_rectangle({
+      color = { g = connections.e and g or 0, a = 1 },
+      filled = true,
+      left_top = { x = x + 1, y = y },
+      right_bottom = { x = x + 2, y = y + 1 },
+      surface = game.surfaces.nauvis,
+    })
+    rendering.draw_rectangle({
+      color = { g = connections.s and g or 0, a = 1 },
+      filled = true,
+      left_top = { x = x, y = y + 1 },
+      right_bottom = { x = x + 1, y = y + 2 },
+      surface = game.surfaces.nauvis,
+    })
+    rendering.draw_rectangle({
+      color = { a = 1 },
+      filled = true,
+      left_top = { x = x + 1, y = y + 1 },
+      right_bottom = { x = x + 2, y = y + 2 },
+      surface = game.surfaces.nauvis,
+    })
+    rendering.draw_text({
+      text = connections.set,
+      surface = game.surfaces.nauvis,
+      target = { x = x + 0.5, y = y + 0.5 },
+      color = { r = 1, g = g, b = 1 },
+      alignment = "center",
+      vertical_alignment = "middle",
+    })
+  end
+
+  global.y = y + 1
 
   -- Finish up
 
