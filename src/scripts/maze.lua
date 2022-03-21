@@ -2,6 +2,12 @@ local area = require("__flib__.area")
 
 local eller = require("scripts.eller")
 
+-- y -> table of x
+local guaranteed_chunks = {
+  [-1] = { [-2] = true, [-1] = true, [0] = true },
+  [0] = { [-2] = true, [-1] = true, [0] = true },
+}
+
 local maze = {}
 
 --- @param box BoundingBox
@@ -37,6 +43,11 @@ function maze.on_chunk_generated(e)
   local x_boundary = global.maze.x_boundary
   if pos.x < -x_boundary or pos.x > x_boundary or pos.y < -1 then
     void_area(e.area, e.surface)
+    return
+  end
+
+  local is_guaranteed = guaranteed_chunks[pos.y] and guaranteed_chunks[pos.y][pos.x]
+  if is_guaranteed then
     return
   end
 
