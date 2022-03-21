@@ -8,4 +8,5 @@ end)
 
 event.on_gui_closed(function()
   global.Row = eller.step(global.Row)
+  global.random = game.create_random_generator(0)
 end)

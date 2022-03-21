@@ -109,7 +109,7 @@ function eller.step(Row)
   local connected_group = { 1 }
 
   for cell = 1, Row.width - 1 do
-    if Row:same(cell, cell + 1) or math.random(2) == 1 then
+    if Row:same(cell, cell + 1) or global.random(2) == 1 then
       -- There is a wall
       table.insert(connected_groups, connected_group)
       connected_group = { cell + 1 }
@@ -128,13 +128,13 @@ function eller.step(Row)
   local NextRow = Row:next()
 
   for set, cells in pairs(Row.sets) do
-    -- Sort randomly
+    -- Get some random cells
     local to_connect = table.filter(cells, function(_)
-      return math.random(2) == 1
     end)
+      return global.random(2) == 1
     -- Always need at least one
     if #to_connect == 0 then
-      table.insert(to_connect, cells[math.random(1, #cells)])
+      table.insert(to_connect, cells[global.random(1, #cells)])
     end
     verticals = table.array_merge({ verticals, to_connect })
     for _, cell in pairs(to_connect) do
