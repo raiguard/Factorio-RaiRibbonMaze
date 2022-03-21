@@ -1,0 +1,15 @@
+{
+  "name": "RaiRibbonMaze",
+  "version": "1.0.0",
+  "title": "Rai's Ribbon Maze",
+  "description": "The maze is destined to be automated. Inspired by H8UL's Ribbon Maze.",
+  "author": "raiguard",
+  "contact": "Discord: raiguard#7402",
+  "homepage": "https://github.com/raiguard/Factorio-RaiRibbonMaze",
+  "factorio_version": "1.1",
+  "dependencies": [ "base >= 1.1.55", "flib >= 0.10.0" ],
+  "package": {
+    "git_publish_branch": "main"
+  }
+}
+
