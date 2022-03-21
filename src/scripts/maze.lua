@@ -32,6 +32,11 @@ function maze.init(tile_size, width)
     x_boundary = math.floor(width / 2),
     y = -1,
   }
+
+  local nauvis = game.surfaces.nauvis
+  local gen = nauvis.map_gen_settings
+  gen.width = width * 32 + 32
+  nauvis.map_gen_settings = gen
 end
 
 --- @param e on_chunk_generated
