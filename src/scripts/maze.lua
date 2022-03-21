@@ -36,6 +36,7 @@ function maze.init(tile_size, width)
   local nauvis = game.surfaces.nauvis
   local gen = nauvis.map_gen_settings
   gen.width = width * 32 + 32
+  gen.height = 0
   nauvis.map_gen_settings = gen
 end
 
@@ -60,8 +61,7 @@ function maze.on_chunk_generated(e)
   local row = global.maze.rows[pos.y]
   if not row then
     for y = global.maze.y, pos.y, 2 do
-      -- TODO: Don't print maze rows
-      local NextRow, rows = eller.step(global.maze.Row, true)
+      local NextRow, rows = eller.step(global.maze.Row, DEBUG)
       global.maze.Row = NextRow
       global.maze.rows[y] = rows[1]
       global.maze.rows[y + 1] = rows[2]
