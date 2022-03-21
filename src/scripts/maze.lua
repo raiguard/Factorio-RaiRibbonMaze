@@ -88,9 +88,10 @@ function maze.on_chunk_generated(e)
     row = global.maze.rows[pos.y]
   end
 
+  local encoded = row[pos.x + x_boundary + 1]
+
   -- Void this chunk if it's a maze boundary
-  local cell = pos.x + x_boundary + 1
-  if row[cell] == 0 then
+  if encoded == 0 then
     void_area(e.area, e.surface)
     return
   end
@@ -98,6 +99,17 @@ function maze.on_chunk_generated(e)
   -- Remove all resources
   for _, resource in pairs(e.surface.find_entities_filtered({ type = "resource" })) do
     resource.destroy({ raise_destroy = true })
+  end
+
+  -- Determine if we should create resources here
+  if eller.is_dead_end(encoded) then
+    rendering.draw_rectangle({
+      color = { r = 0.6, a = 0.6 },
+      filled = true,
+      left_top = e.area.left_top,
+      right_bottom = e.area.right_bottom,
+      surface = game.surfaces.nauvis,
+    })
   end
 end
 
