@@ -35,7 +35,7 @@ function maze.init(tile_size, width)
 
   local nauvis = game.surfaces.nauvis
   local gen = nauvis.map_gen_settings
-  gen.width = width * 32 + 32
+  gen.width = (width + 1) * 32
   gen.height = 0
   nauvis.map_gen_settings = gen
 end
