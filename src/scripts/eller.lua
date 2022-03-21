@@ -71,6 +71,8 @@ function Row.new(width, next_set)
     next_set = next_set or 1,
     --- @type table<Set, Cell[]>
     sets = {},
+    --- @type Cell[]
+    verticals = {},
     width = width,
   }
   Row.load(self)
@@ -97,11 +99,75 @@ function eller.new(width)
   return FirstRow
 end
 
+-- Encoded connections
+
+local directions = {
+  north = 1, -- 0001
+  east = 2, -- 0010
+  south = 4, -- 0100
+  west = 8, -- 1000
+}
+
+--- A cell's connections encoded into four binary bits
+--- @alias EncodedConnections number
+
+--- @param north boolean
+--- @param east boolean
+--- @param south boolean
+--- @param west boolean
+--- @return EncodedConnections
+function eller.encode_connections(north, east, south, west)
+  local map = 0
+  if north then
+    map = bit32.bor(map, directions.north)
+  end
+  if east then
+    map = bit32.bor(map, directions.east)
+  end
+  if south then
+    map = bit32.bor(map, directions.south)
+  end
+  if west then
+    map = bit32.bor(map, directions.west)
+  end
+  return map
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.has_north(encoded_connections)
+  return bit32.band(encoded_connections, directions.north) > 0
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.has_east(encoded_connections)
+  return bit32.band(encoded_connections, directions.east) > 0
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.has_south(encoded_connections)
+  return bit32.band(encoded_connections, directions.south) > 0
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.has_west(encoded_connections)
+  return bit32.band(encoded_connections, directions.west) > 0
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.is_dead_end(encoded_connections)
+  -- A power of two will only have a single connection
+  return encoded_connections > 0 and bit32.band(encoded_connections, encoded_connections - 1) == 0
+end
+
 --- @param Row Row
---- @param debug_print boolean
 --- @return Row NextRow
---- @return boolean[][] rows
-function eller.step(Row, debug_print)
+--- @return EncodedConnections[] connections
+function eller.step(Row)
   -- Randomly merge adjacent sets
 
   --- @type Cell[][]
@@ -125,7 +191,6 @@ function eller.step(Row, debug_print)
 
   -- Add vertical connections
 
-  local verticals = {}
   local NextRow = Row:next()
 
   for set, cells in pairs(Row.sets) do
@@ -137,7 +202,7 @@ function eller.step(Row, debug_print)
     if #to_connect == 0 then
       table.insert(to_connect, cells[global.random(1, #cells)])
     end
-    verticals = table.array_merge({ verticals, to_connect })
+    NextRow.verticals = table.array_merge({ NextRow.verticals, to_connect })
     for _, cell in pairs(to_connect) do
       NextRow:add(cell, set)
     end
@@ -148,43 +213,17 @@ function eller.step(Row, debug_print)
   local connections = {}
   for _, connected_set in pairs(connected_groups) do
     for i, cell in pairs(connected_set) do
+      local first = (i == 1)
       local last = (i == #connected_set)
-      local map = {
-        e = not last,
-        s = table.find(verticals, cell) and true or false,
-        cell = cell,
-        set = Row.cells[cell],
-      }
-      table.insert(connections, map)
-    end
-  end
-
-  -- Because we are generating empty chunks instead of walls, we produce two rows at a time
-  local rows = { {}, {} }
-  for _, connections in pairs(connections) do
-    table.insert(rows[1], true)
-    table.insert(rows[1], connections.e)
-
-    table.insert(rows[2], connections.s)
-    table.insert(rows[2], false)
-  end
-  -- Remove the last entries, which are always walls
-  rows[1][#rows[1]] = nil
-  rows[2][#rows[2]] = nil
-
-  -- Print to console if desired
-  if debug_print then
-    for _, row in pairs(rows) do
-      print(table.concat(
-        table.map(row, function(cell)
-          if cell then
-            return "█"
-          else
-            return " "
-          end
-        end),
-        ""
-      ))
+      table.insert(
+        connections,
+        eller.encode_connections(
+          table.find(Row.verticals, cell),
+          not last,
+          table.find(NextRow.verticals, cell),
+          not first
+        )
+      )
     end
   end
 
@@ -192,58 +231,28 @@ function eller.step(Row, debug_print)
 
   NextRow:populate()
 
-  return NextRow, rows
+  return NextRow, connections
+end
+
+--- Replaces conceptual walls with actual empty cells
+--- @param connections EncodedConnections[]
+--- @return EncodedConnections[] first
+--- @return EncodedConnections[] second
+function eller.gen_wall_cells(connections)
+  local first = {}
+  local second = {}
+  for _, encoded in pairs(connections) do
+    table.insert(first, encoded)
+    table.insert(first, eller.has_east(encoded) and eller.encode_connections(false, true, false, true) or 0)
+
+    table.insert(second, eller.has_south(encoded) and eller.encode_connections(true, false, true, false) or 0)
+    table.insert(second, 0)
+  end
+  -- Remove the last entries, which are always walls
+  first[#first] = nil
+  second[#second] = nil
+
+  return first, second
 end
 
 return eller
-
--- Debugging code:
---
--- if not global.y then
---   global.y = 0
--- end
--- local y = global.y
--- local g = 0.6
-
--- for x, connections in pairs(connections) do
---   local x = x * 2
---   local y = y * 2
---   rendering.draw_rectangle({
---     color = { g = g, a = 1 },
---     filled = true,
---     left_top = { x = x, y = y },
---     right_bottom = { x = x + 1, y = y + 1 },
---     surface = game.surfaces.nauvis,
---   })
---   rendering.draw_rectangle({
---     color = { g = connections.e and g or 0, a = 1 },
---     filled = true,
---     left_top = { x = x + 1, y = y },
---     right_bottom = { x = x + 2, y = y + 1 },
---     surface = game.surfaces.nauvis,
---   })
---   rendering.draw_rectangle({
---     color = { g = connections.s and g or 0, a = 1 },
---     filled = true,
---     left_top = { x = x, y = y + 1 },
---     right_bottom = { x = x + 1, y = y + 2 },
---     surface = game.surfaces.nauvis,
---   })
---   rendering.draw_rectangle({
---     color = { a = 1 },
---     filled = true,
---     left_top = { x = x + 1, y = y + 1 },
---     right_bottom = { x = x + 2, y = y + 2 },
---     surface = game.surfaces.nauvis,
---   })
---   rendering.draw_text({
---     text = connections.set,
---     surface = game.surfaces.nauvis,
---     target = { x = x + 0.5, y = y + 0.5 },
---     color = { r = 1, g = g, b = 1 },
---     alignment = "center",
---     vertical_alignment = "middle",
---   })
--- end
-
--- global.y = y + 1

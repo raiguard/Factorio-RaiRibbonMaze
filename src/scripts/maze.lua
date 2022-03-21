@@ -1,4 +1,5 @@
 local area = require("__flib__.area")
+local table = require("__flib__.table")
 
 local eller = require("scripts.eller")
 
@@ -61,18 +62,35 @@ function maze.on_chunk_generated(e)
   local row = global.maze.rows[pos.y]
   if not row then
     for y = global.maze.y, pos.y, 2 do
-      local NextRow, rows = eller.step(global.maze.Row, DEBUG)
+      local NextRow, connections = eller.step(global.maze.Row)
+      local first, second = eller.gen_wall_cells(connections)
       global.maze.Row = NextRow
-      global.maze.rows[y] = rows[1]
-      global.maze.rows[y + 1] = rows[2]
+      global.maze.rows[y] = first
+      global.maze.rows[y + 1] = second
       global.maze.y = math.max(y + 2, global.maze.y)
+
+      -- Print to console if desired
+      if DEBUG then
+        for _, row in pairs({ first, second }) do
+          print(table.concat(
+            table.map(row, function(encoded)
+              if encoded > 0 then
+                return "█"
+              else
+                return " "
+              end
+            end),
+            ""
+          ))
+        end
+      end
     end
     row = global.maze.rows[pos.y]
   end
 
   -- Void this chunk if it's a maze boundary
   local cell = pos.x + x_boundary + 1
-  if not row[cell] then
+  if row[cell] == 0 then
     void_area(e.area, e.surface)
     return
   end
