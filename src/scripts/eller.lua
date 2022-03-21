@@ -100,7 +100,7 @@ end
 --- @param Row Row
 --- @param debug_print boolean
 --- @return Row NextRow
---- @return string result
+--- @return boolean[][] rows
 function eller.step(Row, debug_print)
   -- Randomly merge adjacent sets
 
@@ -149,27 +149,50 @@ function eller.step(Row, debug_print)
   for _, connected_set in pairs(connected_groups) do
     for i, cell in pairs(connected_set) do
       local last = (i == #connected_set)
-      local map = { e = not last, s = table.find(verticals, cell), cell = cell, set = Row.cells[cell] }
+      local map = {
+        e = not last,
+        s = table.find(verticals, cell) and true or false,
+        cell = cell,
+        set = Row.cells[cell],
+      }
       table.insert(connections, map)
     end
   end
 
-  local wall = " "
-  local passage = "█"
-  local line = wall
-  local next_line = wall
-  for _, connections in ipairs(connections) do
-    line = line .. passage .. (connections.e and passage or wall)
-    next_line = next_line .. (connections.s and passage or wall) .. wall
+  -- Because we are generating empty chunks instead of walls, we produce two rows at a time
+  local rows = { {}, {} }
+  for _, connections in pairs(connections) do
+    table.insert(rows[1], true)
+    table.insert(rows[1], connections.e)
+
+    table.insert(rows[2], connections.s)
+    table.insert(rows[2], false)
   end
-  local result = line .. "\n" .. next_line
-  print(result)
+  -- Remove the last entries, which are always walls
+  rows[1][#rows[1]] = nil
+  rows[2][#rows[2]] = nil
+
+  -- Print to console if desired
+  if debug_print then
+    for _, row in pairs(rows) do
+      print(table.concat(
+        table.map(row, function(cell)
+          if cell then
+            return "█"
+          else
+            return " "
+          end
+        end),
+        ""
+      ))
+    end
+  end
 
   -- Finish up
 
   NextRow:populate()
 
-  return NextRow, result
+  return NextRow, rows
 end
 
 return eller

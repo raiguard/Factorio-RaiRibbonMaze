@@ -7,6 +7,6 @@ event.on_init(function()
   global.random = game.create_random_generator(0)
   local Row = eller.new(21)
   for _ = 1, 21 do
-    Row = eller.step(Row)
+    Row = eller.step(Row, true)
   end
 end)
