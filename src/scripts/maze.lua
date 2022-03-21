@@ -68,6 +68,11 @@ function maze.on_chunk_generated(e)
   local cell = pos.x + x_boundary + 1
   if not row[cell] then
     void_area(e.area, e.surface)
+    return
+  end
+
+  for _, resource in pairs(e.surface.find_entities_filtered({ type = "resource" })) do
+    resource.destroy({ raise_destroy = true })
   end
 end
 
