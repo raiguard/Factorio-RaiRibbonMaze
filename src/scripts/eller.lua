@@ -98,9 +98,10 @@ function eller.new(width)
 end
 
 --- @param Row Row
+--- @param debug_print boolean
 --- @return Row NextRow
 --- @return string result
-function eller.step(Row)
+function eller.step(Row, debug_print)
   -- Randomly merge adjacent sets
 
   --- @type Cell[][]
@@ -130,8 +131,8 @@ function eller.step(Row)
   for set, cells in pairs(Row.sets) do
     -- Get some random cells
     local to_connect = table.filter(cells, function(_)
-    end)
       return global.random(2) == 1
+    end, true)
     -- Always need at least one
     if #to_connect == 0 then
       table.insert(to_connect, cells[global.random(1, #cells)])
@@ -153,65 +154,16 @@ function eller.step(Row)
     end
   end
 
-  -- local wall = " "
-  -- local passage = "█"
-  -- local result = ""
-  -- local line = wall
-  -- local next_line = wall
-  -- for _, connections in ipairs(connections) do
-  --   line = line .. passage .. (connections.e and passage or wall)
-  --   next_line = next_line .. (connections.s and passage or wall) .. wall
-  -- end
-  -- result = result .. line .. "\n" .. next_line
-
-  if not global.y then
-    global.y = 0
+  local wall = " "
+  local passage = "█"
+  local line = wall
+  local next_line = wall
+  for _, connections in ipairs(connections) do
+    line = line .. passage .. (connections.e and passage or wall)
+    next_line = next_line .. (connections.s and passage or wall) .. wall
   end
-  local y = global.y
-  local g = 0.6
-
-  for x, connections in pairs(connections) do
-    local x = x * 2
-    local y = y * 2
-    rendering.draw_rectangle({
-      color = { g = g, a = 1 },
-      filled = true,
-      left_top = { x = x, y = y },
-      right_bottom = { x = x + 1, y = y + 1 },
-      surface = game.surfaces.nauvis,
-    })
-    rendering.draw_rectangle({
-      color = { g = connections.e and g or 0, a = 1 },
-      filled = true,
-      left_top = { x = x + 1, y = y },
-      right_bottom = { x = x + 2, y = y + 1 },
-      surface = game.surfaces.nauvis,
-    })
-    rendering.draw_rectangle({
-      color = { g = connections.s and g or 0, a = 1 },
-      filled = true,
-      left_top = { x = x, y = y + 1 },
-      right_bottom = { x = x + 1, y = y + 2 },
-      surface = game.surfaces.nauvis,
-    })
-    rendering.draw_rectangle({
-      color = { a = 1 },
-      filled = true,
-      left_top = { x = x + 1, y = y + 1 },
-      right_bottom = { x = x + 2, y = y + 2 },
-      surface = game.surfaces.nauvis,
-    })
-    rendering.draw_text({
-      text = connections.set,
-      surface = game.surfaces.nauvis,
-      target = { x = x + 0.5, y = y + 0.5 },
-      color = { r = 1, g = g, b = 1 },
-      alignment = "center",
-      vertical_alignment = "middle",
-    })
-  end
-
-  global.y = y + 1
+  local result = line .. "\n" .. next_line
+  print(result)
 
   -- Finish up
 
@@ -221,3 +173,54 @@ function eller.step(Row)
 end
 
 return eller
+
+-- Debugging code:
+--
+-- if not global.y then
+--   global.y = 0
+-- end
+-- local y = global.y
+-- local g = 0.6
+
+-- for x, connections in pairs(connections) do
+--   local x = x * 2
+--   local y = y * 2
+--   rendering.draw_rectangle({
+--     color = { g = g, a = 1 },
+--     filled = true,
+--     left_top = { x = x, y = y },
+--     right_bottom = { x = x + 1, y = y + 1 },
+--     surface = game.surfaces.nauvis,
+--   })
+--   rendering.draw_rectangle({
+--     color = { g = connections.e and g or 0, a = 1 },
+--     filled = true,
+--     left_top = { x = x + 1, y = y },
+--     right_bottom = { x = x + 2, y = y + 1 },
+--     surface = game.surfaces.nauvis,
+--   })
+--   rendering.draw_rectangle({
+--     color = { g = connections.s and g or 0, a = 1 },
+--     filled = true,
+--     left_top = { x = x, y = y + 1 },
+--     right_bottom = { x = x + 1, y = y + 2 },
+--     surface = game.surfaces.nauvis,
+--   })
+--   rendering.draw_rectangle({
+--     color = { a = 1 },
+--     filled = true,
+--     left_top = { x = x + 1, y = y + 1 },
+--     right_bottom = { x = x + 2, y = y + 2 },
+--     surface = game.surfaces.nauvis,
+--   })
+--   rendering.draw_text({
+--     text = connections.set,
+--     surface = game.surfaces.nauvis,
+--     target = { x = x + 0.5, y = y + 0.5 },
+--     color = { r = 1, g = g, b = 1 },
+--     alignment = "center",
+--     vertical_alignment = "middle",
+--   })
+-- end
+
+-- global.y = y + 1
