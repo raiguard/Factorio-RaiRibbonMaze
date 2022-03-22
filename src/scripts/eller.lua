@@ -164,9 +164,10 @@ end
 
 --- @param Row Row
 --- @param random function
+--- @param finish boolean
 --- @return Row NextRow
 --- @return EncodedConnections[] connections
-function eller.step(Row, random)
+function eller.step(Row, finish, random)
   -- Randomly merge adjacent sets
 
   --- @type Cell[][]
@@ -175,7 +176,7 @@ function eller.step(Row, random)
   local connected_group = { 1 }
 
   for cell = 1, Row.width - 1 do
-    if Row:same(cell, cell + 1) or random(5) <= 2 then
+    if Row:same(cell, cell + 1) or (not finish and random(5) <= 2) then
       -- There is a wall
       table.insert(connected_groups, connected_group)
       connected_group = { cell + 1 }
@@ -192,22 +193,24 @@ function eller.step(Row, random)
 
   local NextRow = Row:next()
 
-  for set, cells in pairs(Row.sets) do
-    -- Get some random cells
-    local to_connect = {}
-    for _, cell in pairs(cells) do
-      if random(2) <= 1 then
-        to_connect[cell] = true
+  if not finish then
+    for set, cells in pairs(Row.sets) do
+      -- Get some random cells
+      local to_connect = {}
+      for _, cell in pairs(cells) do
+        if random(2) <= 1 then
+          to_connect[cell] = true
+        end
       end
-    end
-    -- Always need at least one
-    if not next(to_connect) then
-      to_connect[cells[random(1, #cells)]] = true
-    end
+      -- Always need at least one
+      if not next(to_connect) then
+        to_connect[cells[random(1, #cells)]] = true
+      end
 
-    for cell in pairs(to_connect) do
-      NextRow.verticals[cell] = true
-      NextRow:add(cell, set)
+      for cell in pairs(to_connect) do
+        NextRow.verticals[cell] = true
+        NextRow:add(cell, set)
+      end
     end
   end
 

@@ -108,10 +108,11 @@ function maze.on_chunk_generated(e)
     x = math.floor(maze_pos.x / maze_data.cell_ratio) + 1,
     y = math.floor(maze_pos.y / maze_data.cell_ratio) + 1,
   }
+
   local row = maze_data.rows[maze_pos.y]
   if not row then
     for y = maze_data.y, maze_pos.y, 2 do
-      local NextRow, connections = eller.step(maze_data.Row, maze_data.random)
+      local NextRow, connections = eller.step(maze_data.Row, false, maze_data.random)
       local first, second = eller.gen_wall_cells(connections)
       maze_data.Row = NextRow
       maze_data.rows[y] = first
