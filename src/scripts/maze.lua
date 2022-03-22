@@ -67,7 +67,20 @@ function maze.new(surface, cell_size, width, height, seed)
   }
   -- TODO: Un-hardcode this?
   local resources = {
-    { type = "tile", name = "water", diameter = 1, margin = 0 },
+    { type = "tile", name = "water", diameter = 1, margin = 0, weight = 1 },
+  }
+  -- FIXME: Un-hardcode this
+  local base_density = {
+    ["iron-ore"] = 10,
+    ["copper-ore"] = 8,
+    ["coal"] = 8,
+    ["stone"] = 4,
+    ["uranium-ore"] = 0.9,
+    ["crude-oil"] = 1, -- This does not match the base game
+    ["water"] = 0.5, -- Simulated
+    ["imersite"] = 0.5,
+    ["rare-metals"] = 1,
+    ["mineral-water"] = 1,
   }
   for name in pairs(gen.autoplace_controls) do
     local prototype = game.entity_prototypes[name]
@@ -77,6 +90,7 @@ function maze.new(surface, cell_size, width, height, seed)
         name = name,
         diameter = math.ceil(area.square(prototype.collision_box):width()),
         margin = margins[name] or 0,
+        weight = base_density[name] or 1,
       })
     end
   end
@@ -84,6 +98,20 @@ function maze.new(surface, cell_size, width, height, seed)
   maze_data.resources = resources
 
   global.mazes[surface.index] = maze_data
+end
+
+local function weighted_random(pool, random)
+  local poolsize = 0
+  for _, v in pairs(pool) do
+    poolsize = poolsize + v.weight
+  end
+  local selection = random() * poolsize
+  for k, v in pairs(pool) do
+    selection = selection - v.weight
+    if selection <= 0 then
+      return k
+    end
+  end
 end
 
 --- @param e on_chunk_generated
@@ -172,7 +200,7 @@ function maze.on_chunk_generated(e)
     local random = game.create_random_generator(maze_data.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
 
     -- TODO: Use resource generation frequencies somehow
-    local resource = maze_data.resources[random(#maze_data.resources)]
+    local resource = maze_data.resources[weighted_random(maze_data.resources, random)]
     local Area = area.load(e.area):expand(-1)
     local combined_diameter = resource.diameter + resource.margin
     local margin = (Area:width() % combined_diameter) / 2
