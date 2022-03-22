@@ -21,35 +21,42 @@ local function void_area(box, surface)
   surface.set_tiles(tiles_to_set, true, true, true, true)
 end
 
+function maze.init()
+  global.mazes = {}
+end
+
+--- @param surface LuaSurface
 --- @param cell_size number
 --- @param width number
-function maze.init(cell_size, width)
+--- @param seed number?
+function maze.new(surface, cell_size, width, seed)
   -- Width must be an odd number
   local width = width % 2 == 0 and width - 1 or width
 
+  -- Adjust map size
+  local gen = surface.map_gen_settings
+  gen.width = (width + 1) * cell_size
+  gen.height = 0
+  surface.map_gen_settings = gen
+
   local cell_ratio = math.floor(cell_size / 32)
-  global.maze = {
+  local maze_data = {
     cell_ratio = cell_ratio,
+    random = game.create_random_generator(seed or gen.seed),
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
     rows = {},
+    surface = surface,
     width = width,
     x_boundary = math.floor((width * cell_ratio) / 2),
     y = 1,
   }
-
-  -- Adjust map size
-  local nauvis = game.surfaces.nauvis
-  local gen = nauvis.map_gen_settings
-  gen.width = (width + 1) * cell_size
-  gen.height = 0
-  nauvis.map_gen_settings = gen
 
   -- Determine resource ratios
   -- TODO: Remote interface for this
   local margins = {
     ["crude-oil"] = 2,
     ["mineral-water"] = 2,
-    ["imersite"] = 3,
+    ["imersite"] = 12,
   }
   -- TODO: Un-hardcode this?
   local resources = {
@@ -67,16 +74,23 @@ function maze.init(cell_size, width)
     end
   end
 
-  global.maze.resources = resources
+  maze_data.resources = resources
+
+  global.mazes[surface.index] = maze_data
 end
 
 --- @param e on_chunk_generated
 function maze.on_chunk_generated(e)
+  local maze_data = global.mazes[e.surface.index]
+  if not maze_data then
+    return
+  end
+
   --- @type ChunkPosition
   local pos = e.position
 
   -- If the chunk is outside the radius we care about, just remove it
-  local x_boundary = global.maze.x_boundary
+  local x_boundary = maze_data.x_boundary
   if pos.x < -x_boundary or pos.x > x_boundary or pos.y < -1 then
     void_area(e.area, e.surface)
     return
@@ -88,18 +102,18 @@ function maze.on_chunk_generated(e)
   local maze_pos = { x = pos.x + x_boundary, y = pos.y + 1 }
   -- Convert chunk position to a maze position
   local maze_pos = {
-    x = math.floor(maze_pos.x / global.maze.cell_ratio) + 1,
-    y = math.floor(maze_pos.y / global.maze.cell_ratio) + 1,
+    x = math.floor(maze_pos.x / maze_data.cell_ratio) + 1,
+    y = math.floor(maze_pos.y / maze_data.cell_ratio) + 1,
   }
-  local row = global.maze.rows[maze_pos.y]
+  local row = maze_data.rows[maze_pos.y]
   if not row then
-    for y = global.maze.y, maze_pos.y, 2 do
-      local NextRow, connections = eller.step(global.maze.Row)
+    for y = maze_data.y, maze_pos.y, 2 do
+      local NextRow, connections = eller.step(maze_data.Row, maze_data.random)
       local first, second = eller.gen_wall_cells(connections)
-      global.maze.Row = NextRow
-      global.maze.rows[y] = first
-      global.maze.rows[y + 1] = second
-      global.maze.y = math.max(y + 2, global.maze.y)
+      maze_data.Row = NextRow
+      maze_data.rows[y] = first
+      maze_data.rows[y + 1] = second
+      maze_data.y = math.max(y + 2, maze_data.y)
 
       -- Print to console if desired
       if DEBUG then
@@ -117,15 +131,17 @@ function maze.on_chunk_generated(e)
         end
       end
     end
-    row = global.maze.rows[maze_pos.y]
+    row = maze_data.rows[maze_pos.y]
   end
 
   local encoded = row[maze_pos.x]
 
   -- Map generation
 
-  -- Void this chunk if it's a maze boundary
+  -- "Guaranteed" chunks are the six chunks that comprise the crash site and spawn area - these always need to be generated
   local is_guaranteed = guaranteed_chunks[pos.y] and guaranteed_chunks[pos.y][pos.x] -- Use the unadjusted chunk position
+
+  -- Void this chunk if it's a maze boundary or outside the maze
   if not is_guaranteed and (not encoded or encoded == 0) then
     void_area(e.area, e.surface)
     return
@@ -137,16 +153,17 @@ function maze.on_chunk_generated(e)
   end
 
   -- Determine if we should create resources here
-  if eller.is_dead_end(encoded) then
+  if not is_guaranteed and eller.is_dead_end(encoded) then
     -- TODO: Use resource generation frequencies somehow
-    local resource = global.maze.resources[global.random(#global.maze.resources)]
+    -- FIXME: We can't use the same random generator here, because that makes the maze generation depend on chunk load order
+    local resource = maze_data.resources[maze_data.random(#maze_data.resources)]
     local Area = area.load(e.area):expand(-1)
     local combined_diameter = resource.diameter + resource.margin
     local margin = (Area:width() % combined_diameter) / 2
     local offset = math.floor(combined_diameter / 2 + margin)
     for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
       if resource.type == "entity" then
-        game.surfaces.nauvis.create_entity({
+        maze_data.surface.create_entity({
           name = resource.name,
           position = pos,
           create_build_effect_smoke = false,
@@ -161,7 +178,7 @@ function maze.on_chunk_generated(e)
         for pos in ResourceArea:iterate() do
           table.insert(tiles, { name = resource.name, position = pos })
         end
-        game.surfaces.nauvis.set_tiles(tiles, true, true, true, true)
+        maze_data.surface.set_tiles(tiles, true, true, true, true)
       end
     end
   end

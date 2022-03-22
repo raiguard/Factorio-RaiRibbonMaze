@@ -2,7 +2,7 @@ local event = require("__flib__.event")
 
 local maze = require("scripts.maze")
 
-DEBUG = false
+DEBUG = true
 
 event.on_init(function()
   -- Gatekeeping: Don't let people add this to an existing world
@@ -10,16 +10,25 @@ event.on_init(function()
     error("Cannot add ribbon maze to an existing game")
   end
 
-  -- Guarantee the same maze on a given map seed and parameters
-  if DEBUG then
-    -- Always generate the same maze regardless of seed
-    global.random = game.create_random_generator(0)
-  else
-    global.random = game.create_random_generator()
-  end
+  -- Init mazes
+  maze.init()
 
-  -- Create maze
-  maze.init(settings.global["rrm-cell-size"].value, settings.global["rrm-maze-width"].value)
+  -- Create Nauvis maze
+  maze.new(
+    game.surfaces.nauvis,
+    settings.global["rrm-cell-size"].value,
+    settings.global["rrm-maze-width"].value,
+    -- Give a constant maze seed if in debug mode
+    DEBUG and 0 or nil
+  )
+end)
+
+event.on_surface_created(function(e)
+  maze.new(
+    game.surfaces[e.surface_index],
+    settings.global["rrm-cell-size"].value,
+    settings.global["rrm-maze-width"].value
+  )
 end)
 
 event.on_chunk_generated(maze.on_chunk_generated)

@@ -165,9 +165,10 @@ function eller.is_dead_end(encoded_connections)
 end
 
 --- @param Row Row
+--- @param random function
 --- @return Row NextRow
 --- @return EncodedConnections[] connections
-function eller.step(Row)
+function eller.step(Row, random)
   -- Randomly merge adjacent sets
 
   --- @type Cell[][]
@@ -176,7 +177,7 @@ function eller.step(Row)
   local connected_group = { 1 }
 
   for cell = 1, Row.width - 1 do
-    if Row:same(cell, cell + 1) or global.random(5) <= 2 then
+    if Row:same(cell, cell + 1) or random(5) <= 2 then
       -- There is a wall
       table.insert(connected_groups, connected_group)
       connected_group = { cell + 1 }
@@ -196,11 +197,11 @@ function eller.step(Row)
   for set, cells in pairs(Row.sets) do
     -- Get some random cells
     local to_connect = table.filter(cells, function(_)
-      return global.random(2) <= 1
+      return random(2) <= 1
     end, true)
     -- Always need at least one
     if #to_connect == 0 then
-      table.insert(to_connect, cells[global.random(1, #cells)])
+      table.insert(to_connect, cells[random(1, #cells)])
     end
     NextRow.verticals = table.array_merge({ NextRow.verticals, to_connect })
     for _, cell in pairs(to_connect) do
