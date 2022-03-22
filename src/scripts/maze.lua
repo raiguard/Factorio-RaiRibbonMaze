@@ -39,12 +39,15 @@ function maze.new(surface, cell_size, width, seed)
   gen.height = 0
   surface.map_gen_settings = gen
 
+  seed = seed or gen.seed
+
   local cell_ratio = math.floor(cell_size / 32)
   local maze_data = {
     cell_ratio = cell_ratio,
-    random = game.create_random_generator(seed or gen.seed),
+    random = game.create_random_generator(seed),
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
     rows = {},
+    seed = seed,
     surface = surface,
     width = width,
     x_boundary = math.floor((width * cell_ratio) / 2),
@@ -154,9 +157,11 @@ function maze.on_chunk_generated(e)
 
   -- Determine if we should create resources here
   if not is_guaranteed and eller.is_dead_end(encoded) then
+    -- The resource must be consistent regardless of chunk generation order, so create a new random generator for every resource
+    local random = game.create_random_generator(maze_data.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
+
     -- TODO: Use resource generation frequencies somehow
-    -- FIXME: We can't use the same random generator here, because that makes the maze generation depend on chunk load order
-    local resource = maze_data.resources[maze_data.random(#maze_data.resources)]
+    local resource = maze_data.resources[random(#maze_data.resources)]
     local Area = area.load(e.area):expand(-1)
     local combined_diameter = resource.diameter + resource.margin
     local margin = (Area:width() % combined_diameter) / 2
