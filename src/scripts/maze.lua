@@ -91,7 +91,7 @@ function maze.on_chunk_generated(e)
   local encoded = row[pos.x + x_boundary + 1]
 
   -- Void this chunk if it's a maze boundary
-  if encoded == 0 then
+  if not encoded or encoded == 0 then
     void_area(e.area, e.surface)
     return
   end
