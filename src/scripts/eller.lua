@@ -1,8 +1,6 @@
 -- Eller's Maze Generation Algorithm
 -- Ref: https://weblog.jamisbuck.org/2010/12/29/maze-generation-eller-s-algorithm
 
-local table = require("__flib__.table")
-
 -- --------------------------------------------------
 -- Row object
 
@@ -36,8 +34,8 @@ function Row:merge(sink_cell, target_cell)
   local sink = self.cells[sink_cell]
   local target = self.cells[target_cell]
 
-  self.sets[sink] = table.array_merge({ self.sets[sink], self.sets[target] })
   for _, cell in pairs(self.sets[target]) do
+    table.insert(self.sets[sink], cell)
     self.cells[cell] = sink
   end
   self.sets[target] = nil
@@ -196,15 +194,19 @@ function eller.step(Row, random)
 
   for set, cells in pairs(Row.sets) do
     -- Get some random cells
-    local to_connect = table.filter(cells, function(_)
-      return random(2) <= 1
-    end, true)
-    -- Always need at least one
-    if #to_connect == 0 then
-      table.insert(to_connect, cells[random(1, #cells)])
+    local to_connect = {}
+    for _, cell in pairs(cells) do
+      if random(2) <= 1 then
+        to_connect[cell] = true
+      end
     end
-    NextRow.verticals = table.array_merge({ NextRow.verticals, to_connect })
-    for _, cell in pairs(to_connect) do
+    -- Always need at least one
+    if not next(to_connect) then
+      to_connect[cells[random(1, #cells)]] = true
+    end
+
+    for cell in pairs(to_connect) do
+      NextRow.verticals[cell] = true
       NextRow:add(cell, set)
     end
   end
@@ -218,12 +220,7 @@ function eller.step(Row, random)
       local last = (i == #connected_set)
       table.insert(
         connections,
-        eller.encode_connections(
-          table.find(Row.verticals, cell),
-          not last,
-          table.find(NextRow.verticals, cell),
-          not first
-        )
+        eller.encode_connections(Row.verticals[cell], not last, NextRow.verticals[cell], not first)
       )
     end
   end
