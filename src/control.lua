@@ -18,7 +18,7 @@ event.on_init(function()
     global.random = game.create_random_generator()
   end
 
-  maze.init(32, settings.global["rrm-maze-width"].value)
+  maze.init(settings.global["rrm-cell-size"].value, settings.global["rrm-maze-width"].value)
 end)
 
 event.on_chunk_generated(maze.on_chunk_generated)

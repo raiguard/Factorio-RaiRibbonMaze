@@ -21,22 +21,23 @@ local function void_area(box, surface)
   surface.set_tiles(tiles_to_set, true, true, true, true)
 end
 
---- @param tile_size number
+--- @param cell_size number
 --- @param width number
-function maze.init(tile_size, width)
+function maze.init(cell_size, width)
+  local cell_ratio = math.floor(cell_size / 32)
   -- Create global data
   global.maze = {
+    cell_ratio = cell_ratio,
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
     rows = {},
-    tile_size = tile_size,
     width = width,
-    x_boundary = math.floor(width / 2),
-    y = -1,
+    x_boundary = math.floor((width * cell_ratio) / 2),
+    y = 1,
   }
 
   local nauvis = game.surfaces.nauvis
   local gen = nauvis.map_gen_settings
-  gen.width = (width + 1) * 32
+  gen.width = (width + 1) * cell_size
   gen.height = 0
   nauvis.map_gen_settings = gen
 end
@@ -57,6 +58,11 @@ function maze.on_chunk_generated(e)
   if is_guaranteed then
     return
   end
+
+  -- Offset the position to begin at 0,0
+  pos = { x = pos.x + x_boundary, y = pos.y + 1 }
+  -- Convert chunk position to a maze position
+  pos = { x = math.floor(pos.x / global.maze.cell_ratio) + 1, y = math.floor(pos.y / global.maze.cell_ratio) + 1 }
 
   -- Retrieve or generate row
   local row = global.maze.rows[pos.y]
@@ -88,7 +94,7 @@ function maze.on_chunk_generated(e)
     row = global.maze.rows[pos.y]
   end
 
-  local encoded = row[pos.x + x_boundary + 1]
+  local encoded = row[pos.x]
 
   -- Void this chunk if it's a maze boundary
   if not encoded or encoded == 0 then
