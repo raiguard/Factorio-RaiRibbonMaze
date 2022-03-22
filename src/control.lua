@@ -18,6 +18,7 @@ event.on_init(function()
     global.random = game.create_random_generator()
   end
 
+  -- Create maze
   maze.init(settings.global["rrm-cell-size"].value, settings.global["rrm-maze-width"].value)
 end)
 

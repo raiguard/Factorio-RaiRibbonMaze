@@ -37,11 +37,37 @@ function maze.init(cell_size, width)
     y = 1,
   }
 
+  -- Adjust map size
   local nauvis = game.surfaces.nauvis
   local gen = nauvis.map_gen_settings
   gen.width = (width + 1) * cell_size
   gen.height = 0
   nauvis.map_gen_settings = gen
+
+  -- Determine resource ratios
+  -- TODO: Remote interface for this
+  local margins = {
+    ["crude-oil"] = 2,
+    ["mineral-water"] = 2,
+    ["imersite"] = 3,
+  }
+  -- TODO: Un-hardcode this?
+  local resources = {
+    { type = "tile", name = "water", diameter = 1, margin = 0 },
+  }
+  for name in pairs(gen.autoplace_controls) do
+    local prototype = game.entity_prototypes[name]
+    if prototype and prototype.type == "resource" then
+      table.insert(resources, {
+        type = "entity",
+        name = name,
+        diameter = math.ceil(area.square(prototype.collision_box):width()),
+        margin = margins[name] or 0,
+      })
+    end
+  end
+
+  global.maze.resources = resources
 end
 
 --- @param e on_chunk_generated
@@ -56,6 +82,8 @@ function maze.on_chunk_generated(e)
     return
   end
 
+  -- Retrieve or generate row
+
   -- Offset the position to begin at 0,0
   local maze_pos = { x = pos.x + x_boundary, y = pos.y + 1 }
   -- Convert chunk position to a maze position
@@ -63,8 +91,6 @@ function maze.on_chunk_generated(e)
     x = math.floor(maze_pos.x / global.maze.cell_ratio) + 1,
     y = math.floor(maze_pos.y / global.maze.cell_ratio) + 1,
   }
-
-  -- Retrieve or generate row
   local row = global.maze.rows[maze_pos.y]
   if not row then
     for y = global.maze.y, maze_pos.y, 2 do
@@ -96,6 +122,8 @@ function maze.on_chunk_generated(e)
 
   local encoded = row[maze_pos.x]
 
+  -- Map generation
+
   -- Void this chunk if it's a maze boundary
   local is_guaranteed = guaranteed_chunks[pos.y] and guaranteed_chunks[pos.y][pos.x] -- Use the unadjusted chunk position
   if not is_guaranteed and (not encoded or encoded == 0) then
@@ -104,19 +132,38 @@ function maze.on_chunk_generated(e)
   end
 
   -- Remove all resources
-  for _, resource in pairs(e.surface.find_entities_filtered({ type = "resource" })) do
+  for _, resource in pairs(e.surface.find_entities_filtered({ area = e.area, type = "resource" })) do
     resource.destroy({ raise_destroy = true })
   end
 
   -- Determine if we should create resources here
   if eller.is_dead_end(encoded) then
-    rendering.draw_rectangle({
-      color = { r = 0.6, a = 0.6 },
-      filled = true,
-      left_top = e.area.left_top,
-      right_bottom = e.area.right_bottom,
-      surface = game.surfaces.nauvis,
-    })
+    -- TODO: Use resource generation frequencies somehow
+    local resource = global.maze.resources[global.random(#global.maze.resources)]
+    local Area = area.load(e.area):expand(-1)
+    local combined_diameter = resource.diameter + resource.margin
+    local margin = (Area:width() % combined_diameter) / 2
+    local offset = math.floor(combined_diameter / 2 + margin)
+    for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
+      if resource.type == "entity" then
+        game.surfaces.nauvis.create_entity({
+          name = resource.name,
+          position = pos,
+          create_build_effect_smoke = false,
+          amount = 1000000,
+          snap_to_tile_center = true,
+        })
+      elseif resource.type == "tile" then
+        -- Fill all tiles in the resource's "bounding box"
+        local ResourceArea =
+          area.from_dimensions({ height = resource.diameter, width = resource.diameter }, pos):floor()
+        local tiles = {}
+        for pos in ResourceArea:iterate() do
+          table.insert(tiles, { name = resource.name, position = pos })
+        end
+        game.surfaces.nauvis.set_tiles(tiles, true, true, true, true)
+      end
+    end
   end
 end
 
