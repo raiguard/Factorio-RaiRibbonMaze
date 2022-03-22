@@ -2,6 +2,7 @@ local event = require("__flib__.event")
 
 local maze = require("scripts.maze")
 
+-- Enable debugging niceties
 DEBUG = true
 
 event.on_init(function()
@@ -17,7 +18,7 @@ event.on_init(function()
       settings.global["rrm-maze-width"].value,
       settings.global["rrm-maze-height"].value,
       -- Give a constant maze seed if in debug mode
-      DEBUG and 0 or nil
+      DEBUG and 0
     )
   end
 end)
@@ -26,7 +27,8 @@ event.on_surface_created(function(e)
   maze.new(
     game.surfaces[e.surface_index],
     settings.global["rrm-cell-size"].value,
-    settings.global["rrm-maze-width"].value
+    settings.global["rrm-maze-width"].value,
+    settings.global["rrm-maze-height"].value
   )
 end)
 
