@@ -2,7 +2,7 @@ local event = require("__flib__.event")
 
 local maze = require("scripts.maze")
 
-DEBUG = true
+DEBUG = false
 
 event.on_init(function()
   -- Gatekeeping: Don't let people add this to an existing world

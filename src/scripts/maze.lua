@@ -24,8 +24,10 @@ end
 --- @param cell_size number
 --- @param width number
 function maze.init(cell_size, width)
+  -- Width must be an odd number
+  local width = width % 2 == 0 and width - 1 or width
+
   local cell_ratio = math.floor(cell_size / 32)
-  -- Create global data
   global.maze = {
     cell_ratio = cell_ratio,
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width

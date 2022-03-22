@@ -4,7 +4,7 @@ data:extend({
     name = "rrm-maze-width",
     setting_type = "runtime-global",
     default_value = 21,
-    minimum_value = 8,
+    minimum_value = 7,
     order = "a",
   },
   {
