@@ -56,20 +56,18 @@ function maze.on_chunk_generated(e)
     return
   end
 
-  local is_guaranteed = guaranteed_chunks[pos.y] and guaranteed_chunks[pos.y][pos.x]
-  if is_guaranteed then
-    return
-  end
-
   -- Offset the position to begin at 0,0
-  pos = { x = pos.x + x_boundary, y = pos.y + 1 }
+  local maze_pos = { x = pos.x + x_boundary, y = pos.y + 1 }
   -- Convert chunk position to a maze position
-  pos = { x = math.floor(pos.x / global.maze.cell_ratio) + 1, y = math.floor(pos.y / global.maze.cell_ratio) + 1 }
+  local maze_pos = {
+    x = math.floor(maze_pos.x / global.maze.cell_ratio) + 1,
+    y = math.floor(maze_pos.y / global.maze.cell_ratio) + 1,
+  }
 
   -- Retrieve or generate row
-  local row = global.maze.rows[pos.y]
+  local row = global.maze.rows[maze_pos.y]
   if not row then
-    for y = global.maze.y, pos.y, 2 do
+    for y = global.maze.y, maze_pos.y, 2 do
       local NextRow, connections = eller.step(global.maze.Row)
       local first, second = eller.gen_wall_cells(connections)
       global.maze.Row = NextRow
@@ -93,13 +91,14 @@ function maze.on_chunk_generated(e)
         end
       end
     end
-    row = global.maze.rows[pos.y]
+    row = global.maze.rows[maze_pos.y]
   end
 
-  local encoded = row[pos.x]
+  local encoded = row[maze_pos.x]
 
   -- Void this chunk if it's a maze boundary
-  if not encoded or encoded == 0 then
+  local is_guaranteed = guaranteed_chunks[pos.y] and guaranteed_chunks[pos.y][pos.x] -- Use the unadjusted chunk position
+  if not is_guaranteed and (not encoded or encoded == 0) then
     void_area(e.area, e.surface)
     return
   end
