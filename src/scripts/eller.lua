@@ -176,7 +176,7 @@ function eller.step(Row, finish, random)
   local connected_group = { 1 }
 
   for cell = 1, Row.width - 1 do
-    if Row:same(cell, cell + 1) or (not finish and random(5) <= 2) then
+    if Row:same(cell, cell + 1) or (not finish and random(2) <= 1) then
       -- There is a wall
       table.insert(connected_groups, connected_group)
       connected_group = { cell + 1 }

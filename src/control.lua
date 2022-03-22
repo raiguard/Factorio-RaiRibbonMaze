@@ -18,6 +18,7 @@ event.on_init(function()
     game.surfaces.nauvis,
     settings.global["rrm-cell-size"].value,
     settings.global["rrm-maze-width"].value,
+    settings.global["rrm-maze-height"].value,
     -- Give a constant maze seed if in debug mode
     DEBUG and 0 or nil
   )

@@ -28,10 +28,13 @@ end
 --- @param surface LuaSurface
 --- @param cell_size number
 --- @param width number
+--- @param height number?
 --- @param seed number?
-function maze.new(surface, cell_size, width, seed)
-  -- Width must be an odd number
-  local width = width % 2 == 0 and width - 1 or width
+function maze.new(surface, cell_size, width, height, seed)
+  -- Width and height must be odd numbers
+  width = width % 2 == 0 and width - 1 or width
+  height = height or 0
+  height = (height > 0 and height % 2 == 0) and height - 1 or height
 
   -- Adjust map size
   local gen = surface.map_gen_settings
@@ -44,6 +47,7 @@ function maze.new(surface, cell_size, width, seed)
   local cell_ratio = math.floor(cell_size / 32)
   local maze_data = {
     cell_ratio = cell_ratio,
+    height = height,
     random = game.create_random_generator(seed),
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
     rows = {},
@@ -95,7 +99,7 @@ function maze.on_chunk_generated(e)
   -- If the chunk is outside the radius we care about, just remove it
   local x_boundary = maze_data.x_boundary
   if pos.x < -x_boundary or pos.x > x_boundary or pos.y < -1 then
-    void_area(e.area, e.surface)
+    void_area(e.area, maze_data.surface)
     return
   end
 
@@ -109,10 +113,16 @@ function maze.on_chunk_generated(e)
     y = math.floor(maze_pos.y / maze_data.cell_ratio) + 1,
   }
 
+  -- If we have a finite maze, remove all chunks after the end
+  if maze_data.height > 0 and maze_pos.y > maze_data.height then
+    void_area(e.area, maze_data.surface)
+    return
+  end
+
   local row = maze_data.rows[maze_pos.y]
   if not row then
     for y = maze_data.y, maze_pos.y, 2 do
-      local NextRow, connections = eller.step(maze_data.Row, false, maze_data.random)
+      local NextRow, connections = eller.step(maze_data.Row, y == maze_data.height, maze_data.random)
       local first, second = eller.gen_wall_cells(connections)
       maze_data.Row = NextRow
       maze_data.rows[y] = first
