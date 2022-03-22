@@ -7,7 +7,7 @@
   "contact": "Discord: raiguard#7402",
   "homepage": "https://github.com/raiguard/Factorio-RaiRibbonMaze",
   "factorio_version": "1.1",
-  "dependencies": [ "base >= 1.1.55", "flib >= 0.10.0", "! RibbonMaze", "! RibbonMaze018", "! RibbonMaze1dot1" ],
+  "dependencies": [ "base >= 1.1.55", "flib >= 0.11.0", "! RibbonMaze", "! RibbonMaze018", "! RibbonMaze1dot1" ],
   "package": {
     "git_publish_branch": "main"
   }
