@@ -3,7 +3,7 @@ local event = require("__flib__.event")
 local maze = require("scripts.maze")
 
 -- Enable debugging niceties
-DEBUG = true
+DEBUG = false
 
 event.on_init(function()
   -- Init mazes

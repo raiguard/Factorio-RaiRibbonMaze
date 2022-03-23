@@ -213,12 +213,13 @@ function maze.on_chunk_generated(e)
     -- The resource must be consistent regardless of chunk generation order, so create a new random generator for every resource
     local random = game.create_random_generator(maze_data.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
 
-    -- TODO: Use resource generation frequencies somehow
+    -- TODO: Generate starting area mixed resources and water
     local resource = maze_data.resources[weighted_random(maze_data.resources, random)]
     local Area = area.load(e.area):expand(-1)
     local combined_diameter = resource.diameter + resource.margin
     local margin = (Area:width() % combined_diameter) / 2
     local offset = math.floor(combined_diameter / 2 + margin)
+    -- TODO: Create richness zones instead of having a flat progression
     local richness = ((resource.control_richness or 1) * (random(4, 6) / 5) * (maze_pos.y * 60))
       + resource.additional_richness
     for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
