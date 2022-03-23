@@ -10,17 +10,88 @@ local guaranteed_chunks = {
 }
 
 -- FIXME: Un-hardcode this
-local resource_data = {
-  ["iron-ore"] = { base_density = 10 },
-  ["copper-ore"] = { base_density = 8 },
-  ["coal"] = { base_density = 8 },
-  ["stone"] = { base_density = 4 },
-  ["uranium-ore"] = { base_density = 0.9 },
-  ["crude-oil"] = { base_density = 1, additional_richness = 11000 }, -- This does not match the base game
-  ["water"] = { base_density = 0.5 }, -- Simulated
-  ["imersite"] = { base_density = 0.5 },
-  ["rare-metals"] = { base_density = 1 },
-  ["mineral-water"] = { base_density = 1, additional_richness = 11000 },
+local hardcoded = {
+  {
+    additional_richness = 0,
+    base_density = 8,
+    in_starting_area = true,
+    margin = 0,
+    name = "coal",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 8,
+    in_starting_area = true,
+    margin = 0,
+    name = "copper-ore",
+    richness = 1,
+  },
+  {
+    additional_richness = 11000,
+    base_density = 1,
+    in_starting_area = false,
+    margin = 2,
+    name = "crude-oil",
+    richness = 1,
+  }, -- This does not match the base game
+  {
+    additional_richness = 0,
+    base_density = 10,
+    in_starting_area = true,
+    margin = 0,
+    name = "iron-ore",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 4,
+    in_starting_area = true,
+    margin = 0,
+    name = "stone",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 0.9,
+    in_starting_area = false,
+    margin = 0,
+    name = "uranium-ore",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 0.5,
+    in_starting_area = false,
+    margin = 0,
+    name = "water",
+    richness = 1,
+    tile = true,
+  }, -- Simulated
+  -- Krastorio 2
+  {
+    additional_richness = 0,
+    base_density = 0.5,
+    in_starting_area = false,
+    margin = 12,
+    name = "imersite",
+    richness = 1,
+  },
+  {
+    additional_richness = 11000,
+    base_density = 1,
+    in_starting_area = false,
+    margin = 2,
+    name = "mineral-water",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 1,
+    in_starting_area = false,
+    name = "rare-metals",
+    richness = 1,
+  },
 }
 
 local maze = {}
@@ -37,6 +108,23 @@ end
 
 function maze.init()
   global.mazes = {}
+end
+
+function maze.gen_resource_data()
+  local resources = {}
+  for _, hardcoded in pairs(hardcoded) do
+    local data = table.deep_copy(hardcoded)
+    local prototype = game.entity_prototypes[hardcoded.name]
+    if prototype and prototype.type == "resource" then
+      data.diameter = math.ceil(area.square(prototype.collision_box):width())
+      table.insert(resources, data)
+    elseif game.tile_prototypes[hardcoded.name] then
+      data.diameter = 1
+      table.insert(resources, data)
+    end
+  end
+
+  global.resources = resources
 end
 
 --- @param surface LuaSurface
@@ -58,14 +146,29 @@ function maze.new(surface, cell_size, width, height, seed)
 
   seed = seed or gen.seed
 
+  -- Adjust resource weights
+  -- TODO: Handle if the weight or richness are changed midway
+  local controls = gen.autoplace_controls
+  local resources = table.map(global.resources, function(data)
+    local control = controls[data.name]
+    if control then
+      data.richness = data.richness * control.richness
+      data.weight = data.base_density * control.frequency
+    else
+      data.weight = data.base_density
+    end
+    return data
+  end)
+
   -- game.forces.player.chart(surface, { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } })
 
   local cell_ratio = math.floor(cell_size / 32)
   --- @class Maze
-  local maze_data = {
+  global.mazes[surface.index] = {
     cell_ratio = cell_ratio,
     height = height,
     random = game.create_random_generator(seed),
+    resources = resources,
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
     rows = {},
     seed = seed,
@@ -74,45 +177,6 @@ function maze.new(surface, cell_size, width, height, seed)
     x_boundary = math.floor((width * cell_ratio) / 2),
     y = 1,
   }
-
-  -- Determine resource ratios
-  -- TODO: Remote interface for this
-  local margins = {
-    ["crude-oil"] = 2,
-    ["mineral-water"] = 2,
-    ["imersite"] = 12,
-  }
-  -- TODO: Un-hardcode this?
-  local resources = {
-    {
-      type = "tile",
-      name = "water",
-      diameter = 1,
-      margin = 0,
-      weight = 1,
-      control_richness = 1,
-      additional_richness = 0,
-    },
-  }
-  for name, controls in pairs(gen.autoplace_controls) do
-    local prototype = game.entity_prototypes[name]
-    local resource_data = resource_data[name] or {}
-    if prototype and prototype.type == "resource" then
-      table.insert(resources, {
-        additional_richness = resource_data.additional_richness or 0,
-        control_richness = controls.richness,
-        diameter = math.ceil(area.square(prototype.collision_box):width()),
-        margin = margins[name] or 0,
-        name = name,
-        type = "entity",
-        weight = (resource_data.base_density or 1) * controls.frequency,
-      })
-    end
-  end
-
-  maze_data.resources = resources
-
-  global.mazes[surface.index] = maze_data
 end
 
 --- @param self Maze
@@ -229,15 +293,7 @@ function maze.on_chunk_generated(e)
     local richness = ((resource.control_richness or 1) * (random(4, 6) / 5) * (maze_pos.y * 60))
       + resource.additional_richness
     for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
-      if resource.type == "entity" then
-        self.surface.create_entity({
-          name = resource.name,
-          position = pos,
-          create_build_effect_smoke = false,
-          amount = richness * (random(90, 110) / 100),
-          snap_to_tile_center = true,
-        })
-      elseif resource.type == "tile" then
+      if resource.tile then
         -- Fill all tiles in the resource's "bounding box"
         local ResourceArea =
           area.from_dimensions({ height = resource.diameter, width = resource.diameter }, pos):floor()
@@ -246,6 +302,14 @@ function maze.on_chunk_generated(e)
           table.insert(tiles, { name = resource.name, position = pos })
         end
         self.surface.set_tiles(tiles, true, true, true, true)
+      else
+        self.surface.create_entity({
+          name = resource.name,
+          position = pos,
+          create_build_effect_smoke = false,
+          amount = richness * (random(90, 110) / 100),
+          snap_to_tile_center = true,
+        })
       end
     end
   end

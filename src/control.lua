@@ -8,6 +8,7 @@ DEBUG = false
 event.on_init(function()
   -- Init mazes
   maze.init()
+  maze.gen_resource_data()
 
   -- Only create a maze if we just started a world
   if game.tick == 0 then
