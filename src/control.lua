@@ -33,3 +33,12 @@ event.on_surface_created(function(e)
 end)
 
 event.on_chunk_generated(maze.on_chunk_generated)
+
+event.on_cutscene_cancelled(function(e)
+  local player = game.get_player(e.player_index)
+  local maze = global.mazes[player.surface.index]
+  if maze and maze.print_water_warning then
+    maze.print_water_warning = false
+    player.surface.print({ "message.rrm-water-warning" })
+  end
+end)
