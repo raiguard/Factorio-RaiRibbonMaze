@@ -50,7 +50,6 @@ function maze.new(surface, cell_size, width, height, seed)
   local maze_data = {
     cell_ratio = cell_ratio,
     height = height,
-    print_water_warning = gen.water > 0,
     random = game.create_random_generator(seed),
     Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
     rows = {},
