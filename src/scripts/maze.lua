@@ -44,6 +44,8 @@ function maze.new(surface, cell_size, width, height, seed)
 
   seed = seed or gen.seed
 
+  game.forces.player.chart(surface, { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } })
+
   local cell_ratio = math.floor(cell_size / 32)
   local maze_data = {
     cell_ratio = cell_ratio,
@@ -83,7 +85,7 @@ function maze.new(surface, cell_size, width, height, seed)
     ["rare-metals"] = 1,
     ["mineral-water"] = 1,
   }
-  for name in pairs(gen.autoplace_controls) do
+  for name, controls in pairs(gen.autoplace_controls) do
     local prototype = game.entity_prototypes[name]
     if prototype and prototype.type == "resource" then
       table.insert(resources, {
@@ -91,7 +93,8 @@ function maze.new(surface, cell_size, width, height, seed)
         name = name,
         diameter = math.ceil(area.square(prototype.collision_box):width()),
         margin = margins[name] or 0,
-        weight = base_density[name] or 1,
+        richness = controls.richness,
+        weight = (base_density[name] or 1) * controls.frequency,
       })
     end
   end
@@ -206,13 +209,15 @@ function maze.on_chunk_generated(e)
     local combined_diameter = resource.diameter + resource.margin
     local margin = (Area:width() % combined_diameter) / 2
     local offset = math.floor(combined_diameter / 2 + margin)
+    local richness = resource.richness and resource.richness * (random(4, 6) / 5) or 1
     for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
       if resource.type == "entity" then
         maze_data.surface.create_entity({
           name = resource.name,
           position = pos,
           create_build_effect_smoke = false,
-          amount = 1000000,
+          -- Stupid richness algorithm
+          amount = 250 * richness * (maze_pos.y * 6) + random(-100, 100),
           snap_to_tile_center = true,
         })
       elseif resource.type == "tile" then
