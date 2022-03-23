@@ -80,6 +80,7 @@ function Row.new(width, next_set)
   return self
 end
 
+--- @param self Row
 function Row.load(self)
   setmetatable(self, { __index = Row })
 end
@@ -95,6 +96,11 @@ function eller.new(width)
   local FirstRow = Row.new(width)
   FirstRow:populate()
   return FirstRow
+end
+
+--- @param row Row
+function eller.load(row)
+  Row.load(row)
 end
 
 -- Encoded connections

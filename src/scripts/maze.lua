@@ -61,6 +61,7 @@ function maze.new(surface, cell_size, width, height, seed)
   -- game.forces.player.chart(surface, { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } })
 
   local cell_ratio = math.floor(cell_size / 32)
+  --- @class Maze
   local maze_data = {
     cell_ratio = cell_ratio,
     height = height,
@@ -114,6 +115,11 @@ function maze.new(surface, cell_size, width, height, seed)
   global.mazes[surface.index] = maze_data
 end
 
+--- @param self Maze
+function maze.load(self)
+  eller.load(self.Row)
+end
+
 local function weighted_random(pool, random)
   local poolsize = 0
   for _, v in pairs(pool) do
@@ -130,8 +136,8 @@ end
 
 --- @param e on_chunk_generated
 function maze.on_chunk_generated(e)
-  local maze_data = global.mazes[e.surface.index]
-  if not maze_data then
+  local self = global.mazes[e.surface.index]
+  if not self then
     return
   end
 
@@ -139,9 +145,9 @@ function maze.on_chunk_generated(e)
   local pos = e.position
 
   -- If the chunk is outside the radius we care about, just remove it
-  local x_boundary = maze_data.x_boundary
+  local x_boundary = self.x_boundary
   if pos.x < -x_boundary or pos.x > x_boundary or pos.y < -1 then
-    void_area(e.area, maze_data.surface)
+    void_area(e.area, self.surface)
     return
   end
 
@@ -151,25 +157,25 @@ function maze.on_chunk_generated(e)
   local maze_pos = { x = pos.x + x_boundary, y = pos.y + 1 }
   -- Convert chunk position to a maze position
   local maze_pos = {
-    x = math.floor(maze_pos.x / maze_data.cell_ratio) + 1,
-    y = math.floor(maze_pos.y / maze_data.cell_ratio) + 1,
+    x = math.floor(maze_pos.x / self.cell_ratio) + 1,
+    y = math.floor(maze_pos.y / self.cell_ratio) + 1,
   }
 
   -- If we have a finite maze, remove all chunks after the end
-  if maze_data.height > 0 and maze_pos.y > maze_data.height then
-    void_area(e.area, maze_data.surface)
+  if self.height > 0 and maze_pos.y > self.height then
+    void_area(e.area, self.surface)
     return
   end
 
-  local row = maze_data.rows[maze_pos.y]
+  local row = self.rows[maze_pos.y]
   if not row then
-    for y = maze_data.y, maze_pos.y, 2 do
-      local NextRow, connections = eller.step(maze_data.Row, y == maze_data.height, maze_data.random)
+    for y = self.y, maze_pos.y, 2 do
+      local NextRow, connections = eller.step(self.Row, y == self.height, self.random)
       local first, second = eller.gen_wall_cells(connections)
-      maze_data.Row = NextRow
-      maze_data.rows[y] = first
-      maze_data.rows[y + 1] = second
-      maze_data.y = math.max(y + 2, maze_data.y)
+      self.Row = NextRow
+      self.rows[y] = first
+      self.rows[y + 1] = second
+      self.y = math.max(y + 2, self.y)
 
       -- Print to console if desired
       if DEBUG then
@@ -187,7 +193,7 @@ function maze.on_chunk_generated(e)
         end
       end
     end
-    row = maze_data.rows[maze_pos.y]
+    row = self.rows[maze_pos.y]
   end
 
   local encoded = row[maze_pos.x]
@@ -211,10 +217,10 @@ function maze.on_chunk_generated(e)
   -- Determine if we should create resources here
   if not is_guaranteed and eller.is_dead_end(encoded) then
     -- The resource must be consistent regardless of chunk generation order, so create a new random generator for every resource
-    local random = game.create_random_generator(maze_data.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
+    local random = game.create_random_generator(self.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
 
     -- TODO: Generate starting area mixed resources and water
-    local resource = maze_data.resources[weighted_random(maze_data.resources, random)]
+    local resource = self.resources[weighted_random(self.resources, random)]
     local Area = area.load(e.area):expand(-1)
     local combined_diameter = resource.diameter + resource.margin
     local margin = (Area:width() % combined_diameter) / 2
@@ -224,7 +230,7 @@ function maze.on_chunk_generated(e)
       + resource.additional_richness
     for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
       if resource.type == "entity" then
-        maze_data.surface.create_entity({
+        self.surface.create_entity({
           name = resource.name,
           position = pos,
           create_build_effect_smoke = false,
@@ -239,7 +245,7 @@ function maze.on_chunk_generated(e)
         for pos in ResourceArea:iterate() do
           table.insert(tiles, { name = resource.name, position = pos })
         end
-        maze_data.surface.set_tiles(tiles, true, true, true, true)
+        self.surface.set_tiles(tiles, true, true, true, true)
       end
     end
   end

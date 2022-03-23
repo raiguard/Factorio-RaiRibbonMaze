@@ -23,6 +23,12 @@ event.on_init(function()
   end
 end)
 
+event.on_load(function()
+  for _, maze_data in pairs(global.mazes) do
+    maze.load(maze_data)
+  end
+end)
+
 event.on_surface_created(function(e)
   maze.new(
     game.surfaces[e.surface_index],
