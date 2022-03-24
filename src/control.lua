@@ -3,7 +3,7 @@ local event = require("__flib__.event")
 local maze = require("scripts.maze")
 
 -- Enable debugging niceties
-DEBUG = false
+DEBUG = true
 
 event.on_init(function()
   -- Init mazes
@@ -39,4 +39,9 @@ event.on_surface_created(function(e)
   )
 end)
 
-event.on_chunk_generated(maze.on_chunk_generated)
+event.on_chunk_generated(function(e)
+  local Maze = global.mazes[e.surface.index]
+  if Maze then
+    Maze:on_chunk_generated(e)
+  end
+end)

@@ -2,6 +2,10 @@ local area = require("__flib__.area")
 local table = require("__flib__.table")
 
 local eller = require("scripts.eller")
+local luastar = require("scripts.luastar")
+
+-- --------------------------------------------------
+-- Maze object
 
 -- y -> table of x
 local guaranteed_chunks = {
@@ -9,7 +13,19 @@ local guaranteed_chunks = {
   [0] = { [-2] = true, [-1] = true, [0] = true },
 }
 
+--- @class Resource
+--- @field additional_richness number
+--- @field base_density number
+--- @field diameter number
+--- @field in_starting_area boolean
+--- @field margin number
+--- @field name string
+--- @field richness number
+--- @field tile boolean
+--- @field weight number
+
 -- FIXME: Un-hardcode this
+--- @type Resource[]
 local hardcoded = {
   {
     additional_richness = 0,
@@ -94,17 +110,177 @@ local hardcoded = {
   },
 }
 
-local maze = {}
+--- @class Maze
+local Maze = {}
 
 --- @param box BoundingBox
---- @param surface LuaSurface
-local function void_area(box, surface)
+function Maze:void_area(box)
   local tiles_to_set = {}
   for pos in area.iterate(box) do
     table.insert(tiles_to_set, { name = "out-of-map", position = { pos.x, pos.y } })
   end
-  surface.set_tiles(tiles_to_set, true, true, true, true)
+  self.surface.set_tiles(tiles_to_set, true, true, true, true)
 end
+
+--- @param until_y number
+function Maze:gen_rows(until_y)
+  until_y = until_y or self.y + 1
+  for y = self.y, until_y, 2 do
+    local NextRow, connections = eller.step(self.Row, y == self.height, self.random)
+    local first, second = eller.gen_wall_cells(connections)
+    self.Row = NextRow
+    self.rows[y] = first
+    self.rows[y + 1] = second
+    self.y = math.max(y + 2, self.y)
+
+    -- Print to console if desired
+    if DEBUG then
+      for _, row in pairs({ first, second }) do
+        print(table.concat(
+          table.map(row, function(encoded)
+            if encoded > 0 then
+              return "█"
+            else
+              return " "
+            end
+          end),
+          ""
+        ))
+      end
+    end
+  end
+end
+
+--- Pick a resource, accounting for each resource's weight
+--- @param resources Resource[]
+--- @param random LuaRandomGenerator
+--- @param starting_area boolean
+--- @return Resource
+local function pick_resource(resources, random, starting_area)
+  local poolsize = 0
+  for _, resource in pairs(resources) do
+    if not starting_area or (starting_area and resource.in_starting_area) then
+      poolsize = poolsize + resource.weight
+    end
+  end
+  if poolsize > 0 then
+    local selection = random() * poolsize
+    for _, resource in pairs(resources) do
+      if not starting_area or (starting_area and resource.in_starting_area) then
+        selection = selection - resource.weight
+        if selection <= 0 then
+          return resource
+        end
+      end
+    end
+  end
+end
+
+--- @param e on_chunk_generated
+function Maze:on_chunk_generated(e)
+  --- @type ChunkPosition
+  local pos = e.position
+
+  -- If the chunk is outside the radius we care about, just remove it
+  local x_boundary = self.x_boundary
+  if pos.x < -x_boundary or pos.x > x_boundary or pos.y < -1 then
+    self:void_area(e.area)
+    return
+  end
+
+  -- Retrieve or generate row
+
+  -- Offset the position to begin at 0,0
+  local maze_pos = { x = pos.x + x_boundary, y = pos.y + 1 }
+  -- Convert chunk position to a maze position
+  local maze_pos = {
+    x = math.floor(maze_pos.x / self.cell_ratio) + 1,
+    y = math.floor(maze_pos.y / self.cell_ratio) + 1,
+  }
+
+  -- If we have a finite maze, remove all chunks after the end
+  if self.height > 0 and maze_pos.y > self.height then
+    self:void_area(e.area)
+    return
+  end
+
+  local row = self.rows[maze_pos.y]
+  if not row then
+    self:gen_rows(maze_pos.y)
+    row = self.rows[maze_pos.y]
+  end
+
+  local encoded = row[maze_pos.x]
+
+  -- Map generation
+
+  -- Spawn cells are guaranteed to exist and must be free of resources
+  local is_spawn = self.spawn_cells[maze_pos.y] and self.spawn_cells[maze_pos.y][maze_pos.x]
+
+  -- Void this chunk if it's a maze boundary or outside the maze
+  if not is_spawn and (not encoded or encoded == 0) then
+    self:void_area(e.area)
+    return
+  end
+
+  -- Remove all resources
+  for _, resource in pairs(e.surface.find_entities_filtered({ area = e.area, type = "resource" })) do
+    resource.destroy({ raise_destroy = true })
+  end
+
+  -- Determine if we should create resources here
+  if not is_spawn and eller.is_dead_end(encoded) then
+    -- The resource must be consistent regardless of chunk generation order, so create a new random generator for every resource
+    local random = game.create_random_generator(self.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
+
+    local resource
+
+    if self.starting_ore_patch.x == maze_pos.x and self.starting_ore_patch.y == maze_pos.y then
+      resource = pick_resource(self.resources, random)
+    elseif self.starting_water_patch.x == maze_pos.x and self.starting_water_patch.y == maze_pos.y then
+      -- TODO: This is awful
+      for _, res in pairs(self.resources) do
+        if res.name == "water" then
+          resource = res
+        end
+      end
+    end
+
+    if resource then
+      local Area = area.load(e.area):expand(-1)
+      local combined_diameter = resource.diameter + resource.margin
+      local margin = (Area:width() % combined_diameter) / 2
+      local offset = math.floor(combined_diameter / 2 + margin)
+      -- TODO: Create richness zones instead of having a flat progression
+      local richness = (resource.richness * (random(4, 6) / 5) * (maze_pos.y * 60)) + resource.additional_richness
+      for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
+        if resource.tile then
+          -- Fill all tiles in the resource's "bounding box"
+          local ResourceArea =
+            area.from_dimensions({ height = resource.diameter, width = resource.diameter }, pos):floor()
+          local tiles = {}
+          for pos in ResourceArea:iterate() do
+            table.insert(tiles, { name = resource.name, position = pos })
+          end
+          self.surface.set_tiles(tiles, true, true, true, true)
+        else
+          self.surface.create_entity({
+            name = resource.name,
+            position = pos,
+            create_build_effect_smoke = false,
+            amount = richness * (random(90, 110) / 100),
+            snap_to_tile_center = true,
+          })
+        end
+      end
+    end
+  end
+end
+
+-- --------------------------------------------------
+-- Public interface
+
+local maze = {}
 
 function maze.init()
   global.mazes = {}
@@ -124,6 +300,7 @@ function maze.gen_resource_data()
     end
   end
 
+  --- @type Resource[]
   global.resources = resources
 end
 
@@ -149,6 +326,7 @@ function maze.new(surface, cell_size, width, height, seed)
   -- Adjust resource weights
   -- TODO: Handle if the weight or richness are changed midway
   local controls = gen.autoplace_controls
+  --- @type Resource[]
   local resources = table.map(global.resources, function(data)
     local control = controls[data.name]
     if control then
@@ -162,157 +340,84 @@ function maze.new(surface, cell_size, width, height, seed)
 
   -- game.forces.player.chart(surface, { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } })
 
+  -- Since we replace walls with empty cells, the maze algorithm needs to be half as wide
+  local internal_width = math.ceil(width / 2)
   local cell_ratio = math.floor(cell_size / 32)
-  --- @class Maze
-  global.mazes[surface.index] = {
+
+  -- Determine which cells should be ignored for resource spawning
+  -- Spawn cell is half the width, so it's the same as the internal width
+  local spawn_cell = { x = internal_width, y = 1 }
+  local spawn_cells = {}
+  if cell_ratio == 1 then
+    spawn_cells = {
+      [1] = { [spawn_cell.x - 2] = true, [spawn_cell.x - 1] = true, [spawn_cell.x] = true },
+      [2] = { [spawn_cell.x - 2] = true, [spawn_cell.x - 1] = true, [spawn_cell.x] = true },
+    }
+  elseif cell_ratio == 2 then
+    spawn_cells = {
+      [1] = { [spawn_cell.x - 1] = true, [spawn_cell.x] = true },
+    }
+  end
+
+  --- @type Maze
+  local self = {
     cell_ratio = cell_ratio,
     height = height,
     random = game.create_random_generator(seed),
     resources = resources,
-    Row = eller.new(math.ceil(width / 2)), -- The maze generator needs a halved width
+    Row = eller.new(internal_width),
     rows = {},
     seed = seed,
+    spawn_cells = spawn_cells,
     surface = surface,
     width = width,
     x_boundary = math.floor((width * cell_ratio) / 2),
     y = 1,
   }
+  maze.load(self)
+
+  -- Determine two closest patches for starting resources and water
+  self:gen_rows(14)
+  local closest_cell
+  local closest_len = math.huge
+  local second_closest_cell
+  local second_closest_len = math.huge
+  for y, row in pairs(self.rows) do
+    for x, connections in pairs(row) do
+      local is_spawn = spawn_cells[y] and spawn_cells[y][x]
+      if not is_spawn and eller.is_dead_end(connections) then
+        local cell = { x = x, y = y }
+        local path = luastar:find(width, 14, cell, spawn_cell, function(x, y)
+          return self.rows[y][x] > 0
+        end, true, true)
+        if path then
+          local length = #path
+          if length < second_closest_len then
+            second_closest_len = length
+            second_closest_cell = cell
+          end
+          if length < closest_len then
+            second_closest_len = closest_len
+            closest_len = length
+
+            second_closest_cell = closest_cell
+            closest_cell = cell
+          end
+        end
+      end
+    end
+  end
+
+  self.starting_ore_patch = closest_cell
+  self.starting_water_patch = second_closest_cell
+
+  global.mazes[surface.index] = self
 end
 
 --- @param self Maze
 function maze.load(self)
+  setmetatable(self, { __index = Maze })
   eller.load(self.Row)
-end
-
-local function weighted_random(pool, random)
-  local poolsize = 0
-  for _, v in pairs(pool) do
-    poolsize = poolsize + v.weight
-  end
-  local selection = random() * poolsize
-  for k, v in pairs(pool) do
-    selection = selection - v.weight
-    if selection <= 0 then
-      return k
-    end
-  end
-end
-
---- @param e on_chunk_generated
-function maze.on_chunk_generated(e)
-  local self = global.mazes[e.surface.index]
-  if not self then
-    return
-  end
-
-  --- @type ChunkPosition
-  local pos = e.position
-
-  -- If the chunk is outside the radius we care about, just remove it
-  local x_boundary = self.x_boundary
-  if pos.x < -x_boundary or pos.x > x_boundary or pos.y < -1 then
-    void_area(e.area, self.surface)
-    return
-  end
-
-  -- Retrieve or generate row
-
-  -- Offset the position to begin at 0,0
-  local maze_pos = { x = pos.x + x_boundary, y = pos.y + 1 }
-  -- Convert chunk position to a maze position
-  local maze_pos = {
-    x = math.floor(maze_pos.x / self.cell_ratio) + 1,
-    y = math.floor(maze_pos.y / self.cell_ratio) + 1,
-  }
-
-  -- If we have a finite maze, remove all chunks after the end
-  if self.height > 0 and maze_pos.y > self.height then
-    void_area(e.area, self.surface)
-    return
-  end
-
-  local row = self.rows[maze_pos.y]
-  if not row then
-    for y = self.y, maze_pos.y, 2 do
-      local NextRow, connections = eller.step(self.Row, y == self.height, self.random)
-      local first, second = eller.gen_wall_cells(connections)
-      self.Row = NextRow
-      self.rows[y] = first
-      self.rows[y + 1] = second
-      self.y = math.max(y + 2, self.y)
-
-      -- Print to console if desired
-      if DEBUG then
-        for _, row in pairs({ first, second }) do
-          print(table.concat(
-            table.map(row, function(encoded)
-              if encoded > 0 then
-                return "█"
-              else
-                return " "
-              end
-            end),
-            ""
-          ))
-        end
-      end
-    end
-    row = self.rows[maze_pos.y]
-  end
-
-  local encoded = row[maze_pos.x]
-
-  -- Map generation
-
-  -- "Guaranteed" chunks are the six chunks that comprise the crash site and spawn area - these always need to be generated
-  local is_guaranteed = guaranteed_chunks[pos.y] and guaranteed_chunks[pos.y][pos.x] -- Use the unadjusted chunk position
-
-  -- Void this chunk if it's a maze boundary or outside the maze
-  if not is_guaranteed and (not encoded or encoded == 0) then
-    void_area(e.area, e.surface)
-    return
-  end
-
-  -- Remove all resources
-  for _, resource in pairs(e.surface.find_entities_filtered({ area = e.area, type = "resource" })) do
-    resource.destroy({ raise_destroy = true })
-  end
-
-  -- Determine if we should create resources here
-  if not is_guaranteed and eller.is_dead_end(encoded) then
-    -- The resource must be consistent regardless of chunk generation order, so create a new random generator for every resource
-    local random = game.create_random_generator(self.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
-
-    -- TODO: Generate starting area mixed resources and water
-    local resource = self.resources[weighted_random(self.resources, random)]
-    local Area = area.load(e.area):expand(-1)
-    local combined_diameter = resource.diameter + resource.margin
-    local margin = (Area:width() % combined_diameter) / 2
-    local offset = math.floor(combined_diameter / 2 + margin)
-    -- TODO: Create richness zones instead of having a flat progression
-    local richness = ((resource.control_richness or 1) * (random(4, 6) / 5) * (maze_pos.y * 60))
-      + resource.additional_richness
-    for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
-      if resource.tile then
-        -- Fill all tiles in the resource's "bounding box"
-        local ResourceArea =
-          area.from_dimensions({ height = resource.diameter, width = resource.diameter }, pos):floor()
-        local tiles = {}
-        for pos in ResourceArea:iterate() do
-          table.insert(tiles, { name = resource.name, position = pos })
-        end
-        self.surface.set_tiles(tiles, true, true, true, true)
-      else
-        self.surface.create_entity({
-          name = resource.name,
-          position = pos,
-          create_build_effect_smoke = false,
-          amount = richness * (random(90, 110) / 100),
-          snap_to_tile_center = true,
-        })
-      end
-    end
-  end
 end
 
 return maze
