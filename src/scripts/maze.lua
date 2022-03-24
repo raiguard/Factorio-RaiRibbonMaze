@@ -44,7 +44,7 @@ local hardcoded = {
     margin = 2,
     name = "crude-oil",
     richness = 1,
-  }, -- This does not match the base game
+  },
   {
     additional_richness = 0,
     base_density = 10,
@@ -99,7 +99,57 @@ local hardcoded = {
     additional_richness = 0,
     base_density = 1,
     in_starting_area = false,
+    margin = 0,
     name = "rare-metals",
+    richness = 1,
+  },
+  -- BZ mods
+  {
+    additional_richness = 0,
+    base_density = 0.5,
+    in_starting_area = false,
+    margin = 0,
+    name = "diamond",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 3,
+    in_starting_area = false,
+    margin = 0,
+    name = "titanium-ore",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 4,
+    in_starting_area = false,
+    margin = 0,
+    name = "tungsten-ore",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 4,
+    in_starting_area = true,
+    margin = 0,
+    name = "zircon",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 6,
+    in_starting_area = true,
+    margin = 0,
+    name = "aluminum-ore",
+    richness = 1,
+  },
+  {
+    additional_richness = 0,
+    base_density = 6,
+    in_starting_area = true,
+    margin = 0,
+    name = "lead-ore",
     richness = 1,
   },
 }
@@ -384,8 +434,6 @@ function maze.new(surface, cell_size, width, height, seed)
     end
     return data
   end)
-
-  -- game.forces.player.chart(surface, { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } })
 
   -- Since we replace walls with empty cells, the maze algorithm needs to be half as wide
   local internal_width = math.ceil(width / 2)
