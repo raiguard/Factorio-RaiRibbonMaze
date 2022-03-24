@@ -7,12 +7,6 @@ local luastar = require("scripts.luastar")
 -- --------------------------------------------------
 -- Maze object
 
--- y -> table of x
-local guaranteed_chunks = {
-  [-1] = { [-2] = true, [-1] = true, [0] = true },
-  [0] = { [-2] = true, [-1] = true, [0] = true },
-}
-
 --- @class Resource
 --- @field additional_richness number
 --- @field base_density number
@@ -154,23 +148,18 @@ end
 --- Pick a resource, accounting for each resource's weight
 --- @param resources Resource[]
 --- @param random LuaRandomGenerator
---- @param starting_area boolean
 --- @return Resource
-local function pick_resource(resources, random, starting_area)
+local function pick_resource(resources, random)
   local poolsize = 0
   for _, resource in pairs(resources) do
-    if not starting_area or (starting_area and resource.in_starting_area) then
-      poolsize = poolsize + resource.weight
-    end
+    poolsize = poolsize + resource.weight
   end
   if poolsize > 0 then
     local selection = random() * poolsize
     for _, resource in pairs(resources) do
-      if not starting_area or (starting_area and resource.in_starting_area) then
-        selection = selection - resource.weight
-        if selection <= 0 then
-          return resource
-        end
+      selection = selection - resource.weight
+      if selection <= 0 then
+        return resource
       end
     end
   end
@@ -233,21 +222,64 @@ function Maze:on_chunk_generated(e)
     -- The resource must be consistent regardless of chunk generation order, so create a new random generator for every resource
     local random = game.create_random_generator(self.seed + (maze_pos.y * 10000) + (maze_pos.x * 1000))
 
-    local resource
+    local SpawningArea = area.load(e.area):expand(-1)
+    local to_spawn = {}
 
-    if self.starting_ore_patch.x == maze_pos.x and self.starting_ore_patch.y == maze_pos.y then
-      resource = pick_resource(self.resources, random)
-    elseif self.starting_water_patch.x == maze_pos.x and self.starting_water_patch.y == maze_pos.y then
+    local is_starting_patch = self.starting_ore_patch.x == maze_pos.x and self.starting_ore_patch.y == maze_pos.y
+    local is_starting_water = self.starting_water_patch.x == maze_pos.x and self.starting_water_patch.y == maze_pos.y
+    if is_starting_patch then
+      local starting_resources = table.array_filter(self.resources, function(resource)
+        return resource.in_starting_area
+      end)
+      local chunks = math.max(math.ceil(math.sqrt(#starting_resources)), 2)
+      while 30 % chunks ~= 0 do
+        if chunks > 10 then
+          error("Too many starting area resource chunks")
+        end
+        chunks = chunks + 1
+      end
+      local total_chunks = chunks ^ 2
+      local chunk_width = SpawningArea:width() / chunks
+
+      -- Guarantee that there is at least one of every resource
+      local guaranteed = {}
+      for _, resource in pairs(starting_resources) do
+        local i = random(1, total_chunks)
+        while guaranteed[i] do
+          i = random(1, total_chunks)
+        end
+        guaranteed[i] = resource
+      end
+
+      -- Fill in the resources
+      local i = 0
+      for pos in SpawningArea:iterate(chunk_width) do
+        i = i + 1
+        if not to_spawn[i] then
+          to_spawn[i] = {
+            Area = area.load({
+              left_top = { x = pos.x, y = pos.y },
+              right_bottom = { x = pos.x + chunk_width, y = pos.y + chunk_width },
+            }),
+            resource = guaranteed[i] or pick_resource(starting_resources, random),
+          }
+        end
+      end
+    elseif is_starting_water then
       -- TODO: This is awful
       for _, res in pairs(self.resources) do
         if res.name == "water" then
-          resource = res
+          table.insert(to_spawn, { Area = SpawningArea, resource = res })
         end
       end
+    else
+      table.insert(to_spawn, { Area = SpawningArea, resource = pick_resource(self.resources, random) })
     end
 
-    if resource then
-      local Area = area.load(e.area):expand(-1)
+    for _, to_spawn in pairs(to_spawn) do
+      local Area = to_spawn.Area
+      local resource = to_spawn.resource
+
       local combined_diameter = resource.diameter + resource.margin
       local margin = (Area:width() % combined_diameter) / 2
       local offset = math.floor(combined_diameter / 2 + margin)
@@ -356,6 +388,10 @@ function maze.new(surface, cell_size, width, height, seed)
   elseif cell_ratio == 2 then
     spawn_cells = {
       [1] = { [spawn_cell.x - 1] = true, [spawn_cell.x] = true },
+    }
+  else
+    spawn_cells = {
+      [1] = { [spawn_cell.x] = true },
     }
   end
 
