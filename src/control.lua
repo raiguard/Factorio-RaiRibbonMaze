@@ -3,7 +3,7 @@ local event = require("__flib__.event")
 local maze = require("scripts.maze")
 
 -- Enable debugging niceties
-DEBUG = true
+DEBUG = false
 
 event.on_init(function()
   -- Init mazes
@@ -45,3 +45,10 @@ event.on_chunk_generated(function(e)
     Maze:on_chunk_generated(e)
   end
 end)
+
+-- event.on_player_created(function()
+--   game.forces.player.chart(
+--     game.surfaces.nauvis,
+--     { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } }
+--   )
+-- end)
