@@ -123,18 +123,24 @@ local directions = {
 function eller.encode_connections(north, east, south, west)
   local map = 0
   if north then
-    map = bit32.bor(map, directions.north)
+    map = eller.encode_north(map)
   end
   if east then
-    map = bit32.bor(map, directions.east)
+    map = eller.encode_east(map)
   end
   if south then
-    map = bit32.bor(map, directions.south)
+    map = eller.encode_south(map)
   end
   if west then
-    map = bit32.bor(map, directions.west)
+    map = eller.encode_west(map)
   end
   return map
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.encode_north(encoded_connections)
+  return bit32.bor(encoded_connections, directions.north)
 end
 
 --- @param encoded_connections EncodedConnections
@@ -145,14 +151,32 @@ end
 
 --- @param encoded_connections EncodedConnections
 --- @return boolean
+function eller.encode_east(encoded_connections)
+  return bit32.bor(encoded_connections, directions.east)
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
 function eller.has_east(encoded_connections)
   return bit32.band(encoded_connections, directions.east) > 0
 end
 
 --- @param encoded_connections EncodedConnections
 --- @return boolean
+function eller.encode_south(encoded_connections)
+  return bit32.bor(encoded_connections, directions.south)
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
 function eller.has_south(encoded_connections)
   return bit32.band(encoded_connections, directions.south) > 0
+end
+
+--- @param encoded_connections EncodedConnections
+--- @return boolean
+function eller.encode_west(encoded_connections)
+  return bit32.bor(encoded_connections, directions.west)
 end
 
 --- @param encoded_connections EncodedConnections
