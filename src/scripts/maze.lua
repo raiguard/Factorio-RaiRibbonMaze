@@ -122,6 +122,13 @@ function Maze:gen_rows(until_y)
   for y = self.y, until_y, 2 do
     local NextRow, connections = eller.step(self.Row, y == self.height, self.random)
     local first, second = eller.gen_wall_cells(connections)
+
+    -- Guarantee that the spawning cell exists
+    if y == 1 then
+      local i = math.ceil(self.width / 2)
+      first[i] = eller.encode_east(first[i])
+    end
+
     self.Row = NextRow
     self.rows[y] = first
     self.rows[y + 1] = second
@@ -227,6 +234,7 @@ function Maze:on_chunk_generated(e)
 
     local is_starting_patch = self.starting_ore_patch.x == maze_pos.x and self.starting_ore_patch.y == maze_pos.y
     local is_starting_water = self.starting_water_patch.x == maze_pos.x and self.starting_water_patch.y == maze_pos.y
+    local is_starting_oil = self.starting_oil_patch.x == maze_pos.x and self.starting_oil_patch.y == maze_pos.y
     if is_starting_patch then
       local starting_resources = table.array_filter(self.resources, function(resource)
         return resource.in_starting_area
@@ -269,6 +277,13 @@ function Maze:on_chunk_generated(e)
       -- TODO: This is awful
       for _, res in pairs(self.resources) do
         if res.name == "water" then
+          table.insert(to_spawn, { Area = SpawningArea, resource = res })
+        end
+      end
+    elseif is_starting_oil then
+      -- TODO: This is awful
+      for _, res in pairs(self.resources) do
+        if res.name == "crude-oil" then
           table.insert(to_spawn, { Area = SpawningArea, resource = res })
         end
       end
@@ -413,31 +428,39 @@ function maze.new(surface, cell_size, width, height, seed)
   maze.load(self)
 
   -- Determine two closest patches for starting resources and water
-  self:gen_rows(14)
   local closest_cell
-  local closest_len = math.huge
   local second_closest_cell
-  local second_closest_len = math.huge
-  for y, row in pairs(self.rows) do
-    for x, connections in pairs(row) do
-      local is_spawn = spawn_cells[y] and spawn_cells[y][x]
-      if not is_spawn and eller.is_dead_end(connections) then
-        local cell = { x = x, y = y }
-        local path = luastar:find(width, 14, cell, spawn_cell, function(x, y)
-          return self.rows[y][x] > 0
-        end, true, true)
-        if path then
-          local length = #path
-          if length < second_closest_len then
-            second_closest_len = length
-            second_closest_cell = cell
-          end
-          if length < closest_len then
-            second_closest_len = closest_len
-            closest_len = length
+  local furthest_cell
+  while not closest_cell or not second_closest_cell or not furthest_cell do
+    self:gen_rows(self.y + 9)
+    local closest_len = math.huge
+    local second_closest_len = math.huge
+    local furthest_cell_len = 0
+    for y, row in pairs(self.rows) do
+      for x, connections in pairs(row) do
+        local is_spawn = spawn_cells[y] and spawn_cells[y][x]
+        if not is_spawn and eller.is_dead_end(connections) then
+          local cell = { x = x, y = y }
+          local path = luastar:find(width, self.y - 1, cell, spawn_cell, function(x, y)
+            return self.rows[y][x] > 0
+          end, true, true)
+          if path then
+            local length = #path
+            if length < second_closest_len then
+              second_closest_len = length
+              second_closest_cell = cell
+            end
+            if length < closest_len then
+              second_closest_len = closest_len
+              closest_len = length
 
-            second_closest_cell = closest_cell
-            closest_cell = cell
+              second_closest_cell = closest_cell
+              closest_cell = cell
+            end
+            if length > furthest_cell_len then
+              furthest_cell_len = length
+              furthest_cell = cell
+            end
           end
         end
       end
@@ -446,6 +469,7 @@ function maze.new(surface, cell_size, width, height, seed)
 
   self.starting_ore_patch = closest_cell
   self.starting_water_patch = second_closest_cell
+  self.starting_oil_patch = furthest_cell
 
   global.mazes[surface.index] = self
 end
