@@ -1,4 +1,5 @@
 local area = require("__flib__.area")
+local misc = require("__flib__.misc")
 local table = require("__flib__.table")
 
 local eller = require("scripts.eller")
@@ -80,7 +81,7 @@ local hardcoded = {
   }, -- Simulated
   -- Krastorio 2
   {
-    additional_richness = 0,
+    additional_richness = 350000,
     base_density = 0.5,
     in_starting_area = false,
     margin = 12,
@@ -348,8 +349,15 @@ function Maze:on_chunk_generated(e)
       local combined_diameter = resource.diameter + resource.margin
       local margin = (Area:width() % combined_diameter) / 2
       local offset = math.floor(combined_diameter / 2 + margin)
-      -- TODO: Create richness zones instead of having a flat progression
-      local richness = (resource.richness * (random(4, 6) / 5) * (maze_pos.y * 60)) + resource.additional_richness
+      local richness = resource.richness * (random(4, 6) / 5)
+      if maze_pos.y < 7 then
+        richness = richness * misc.get_distance(self.spawn_cell, maze_pos) * 60
+      elseif maze_pos.y < 80 then
+        richness = richness * maze_pos.y * 100
+      else
+        richness = richness * maze_pos.y * 1000
+      end
+      richness = richness + resource.additional_richness
       for pos in Area:iterate(combined_diameter, { x = offset, y = offset }) do
         if resource.tile then
           -- Fill all tiles in the resource's "bounding box"
@@ -467,6 +475,7 @@ function maze.new(surface, cell_size, width, height, seed)
     Row = eller.new(internal_width),
     rows = {},
     seed = seed,
+    spawn_cell = spawn_cell,
     spawn_cells = spawn_cells,
     surface = surface,
     width = width,
