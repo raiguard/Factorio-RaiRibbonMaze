@@ -315,12 +315,15 @@ function Maze:on_chunk_generated(e)
       for pos in SpawningArea:iterate(chunk_width) do
         i = i + 1
         if not to_spawn[i] then
+          -- TEMPORARY: The starting area ores were a bit anemic
+          local resource = table.deep_copy(guaranteed[i] or pick_resource(starting_resources, random))
+          resource.richness = resource.richness * 10
           to_spawn[i] = {
             Area = area.load({
               left_top = { x = pos.x, y = pos.y },
               right_bottom = { x = pos.x + chunk_width, y = pos.y + chunk_width },
             }),
-            resource = guaranteed[i] or pick_resource(starting_resources, random),
+            resource = resource,
           }
         end
       end
