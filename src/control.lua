@@ -52,3 +52,22 @@ end)
 --     { left_top = { x = -350, y = -30 }, right_bottom = { x = 350, y = 3000 } }
 --   )
 -- end)
+
+remote.add_interface("RaiRibbonMaze", {
+  --- @param player LuaPlayer
+  regen_resources = function(player)
+    local chunk_pos = { x = math.floor(player.position.x / 32), y = math.floor(player.position.y / 32) }
+
+    local Maze = global.mazes[player.surface.index]
+    if Maze then
+      Maze:on_chunk_generated({
+        area = {
+          left_top = { x = chunk_pos.x * 32, y = chunk_pos.y * 32 },
+          right_bottom = { x = chunk_pos.x * 32 + 32, y = chunk_pos.y * 32 + 32 },
+        },
+        position = chunk_pos,
+        surface = player.surface,
+      })
+    end
+  end,
+})
