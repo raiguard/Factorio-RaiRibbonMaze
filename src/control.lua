@@ -30,14 +30,14 @@ event.on_load(function()
   end
 end)
 
-event.on_surface_created(function(e)
-  maze.new(
-    game.surfaces[e.surface_index],
-    settings.global["rrm-cell-size"].value,
-    settings.global["rrm-maze-width"].value,
-    settings.global["rrm-maze-height"].value
-  )
-end)
+-- event.on_surface_created(function(e)
+--   maze.new(
+--     game.surfaces[e.surface_index],
+--     settings.global["rrm-cell-size"].value,
+--     settings.global["rrm-maze-width"].value,
+--     settings.global["rrm-maze-height"].value
+--   )
+-- end)
 
 event.on_chunk_generated(function(e)
   local Maze = global.mazes[e.surface.index]
